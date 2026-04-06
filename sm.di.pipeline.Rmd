@@ -1,0 +1,1897 @@
+---
+title: "Chapter 2 Reprocess"
+output: html_document
+date: "2025-10-22"
+---
+we will do seasonal and diel separate chunks but both on here! 
+
+
+```{r}
+setwd("/Users/madelina/Desktop/Chapter 2")
+getwd()
+
+```
+
+
+```{r}
+# Installing/loading packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+# Installing dada2 package from CRAN
+install.packages("dada2", dependencies = TRUE)
+```
+
+```{r}
+# Loading dada2 package
+library(dada2)
+
+# Checking the installed version of dada2
+packageVersion("dada2")
+```
+
+
+```{r}
+library(ShortRead)
+library(dada2)
+library(Rcpp)
+```
+
+1. STARTED A NEW PROJECT ~ SM 
+Overall, this code checks for the existence of a directory named fastqfiles in the current working directory. If the directory does not exist, it creates it and informs the user. If it does exist, it simply informs the user that the directory is already there. This is a common practice in R programming to ensure that the necessary directories are available for data storage or processing.
+```{r}
+# Checking Current Working Directory
+print(getwd())
+
+# Defining Path Relative to Current Directory
+path1 <- "fastqfiles_sm/" 
+
+# Checking if Path Exists
+if (!file.exists(path1)) {
+  # Creating Directory if it doesn't exist
+  dir.create(path1)
+  print(paste("Created directory:", path1))
+} else {
+  print(paste("Directory already exists:", path1))
+}
+```
+
+DIEL
+```{r}
+# Checking Current Working Directory
+print(getwd())
+
+# Defining Path Relative to Current Directory
+path2 <- "fastqfiles_diel/" 
+
+# Checking if Path Exists
+if (!file.exists(path2)) {
+  # Creating Directory if it doesn't exist
+  dir.create(path2)
+  print(paste("Created directory:", path2))
+} else {
+  print(paste("Directory already exists:", path2))
+}
+```
+
+2. Generates sorted lists of filenames - lists them by R1 & R2
+path: the directory containing the file path
+pattern: selecting files that contain that in their name
+sort: putting these files in alphabetically and stored in fnFs & fnRs
+```{r}
+fnFssm <- sort(list.files(path1, pattern = "_R1_16S_final.fastq", full.names = TRUE))
+
+fnRssm <- sort(list.files(path1, pattern = "_R2_16S_final.fastq", full.names = TRUE))
+```
+
+2. Generates sorted lists of filenames - lists them by R1 & R2
+path: the directory containing the file path
+pattern: selecting files that contain that in their name
+sort: putting these files in alphabetically and stored in fnFs & fnRs
+```{r}
+fnFsdi <- sort(list.files(path2, pattern = "_R1_16S_final.fastq", full.names = TRUE))
+
+fnRsdi <- sort(list.files(path2, pattern = "_R2_16S_final.fastq", full.names = TRUE))
+```
+
+3. This is used to generate the list of sample names by extracting the  2nd & 3rd parts of the file name (this is more parts than usual but we have multiple experiments for this chapter, so it's fine)
+
+```{r}
+get.sample.name <- function(fname) {
+  parts <- strsplit(basename(fname), "_")[[1]]
+  parts[2:3]
+}
+
+sample.namessm <- unname(sapply(fnFssm, get.sample.name))
+```
+
+```{r}
+print(sample.namessm)
+```
+
+```{r}
+get.sample.name <- function(fname) {
+  parts <- strsplit(basename(fname), "_")[[1]]
+  parts[2:3]
+}
+
+sample.namesdi <- unname(sapply(fnFsdi, get.sample.name))
+```
+
+```{r}
+print(sample.namesdi)
+```
+```{r}
+print(fnFssm)
+print(fnRssm)
+
+```
+
+```{r}
+print(fnFsdi)
+print(fnRsdi)
+
+```
+
+5. identifying primers and all orientations of primers 
+```{r}
+FWD <- "GTGYCAGCMGCCGCGGTAA"  
+REV <- "GGACTACNVGGGTWTCTAAT"  
+```
+
+This is creating all orientations of the primers
+```{r}
+allOrients <- function(primer) {
+  require(Biostrings)
+  dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
+  orients <- c(Forward = dna, Complement = complement(dna), Reverse = reverse(dna), 
+               RevComp = reverseComplement(dna))
+  return(sapply(orients, toString))  # Convert back to character vector
+}
+FWD.orients <- allOrients(FWD)
+REV.orients <- allOrients(REV)
+FWD.orients
+REV.orients
+
+```
+6. Filters and trims the original fastq files (fnFs and fnRs), removes reads with too many ambiguous bases (N's), and saves the filtered files in a subdirectory named "filtN" within the original directory. --so my filtN will be within fastqfiles folder in my MG PT2 Working directory
+
+seasonal samples FiltN
+*it takes a long time - can see files being created in the FiltN folder
+```{r}
+fnFssm.filtN <- file.path(path1, "filtN", basename(fnFssm)) # Put N-filtered files in filtN/ subdirectory
+fnRssm.filtN <- file.path(path1, "filtN", basename(fnRssm))
+filterAndTrim(fnFssm, fnFssm.filtN, fnRssm, fnRssm.filtN, maxN = 0, multithread = TRUE, compress=TRUE)
+```
+
+**overloaded memory after 16 samples (R1 & R2), so 32 files right now in the filtN folder in the fastqfiles_sm 
+
+*will have to do the rest in a way that consumes less memory 
+
+
+```{r}
+# List the files that are already filtered
+done_files <- list.files(file.path(path1, "filtN"), full.names = FALSE)
+```
+
+```{r}
+# Keep only those samples that are NOT already done
+fnFssm1 <- fnFssm[!basename(fnFssm) %in% done_files]
+fnRssm1 <- fnRssm[!basename(fnRssm) %in% done_files]
+```
+
+
+```{r}
+# Define where new filtered files will go
+fnFssm1.filtN <- file.path(path1, "filtN", basename(fnFssm1))
+fnRssm1.filtN <- file.path(path1, "filtN", basename(fnRssm1))
+```
+
+*will start up here again* should loop through remaining 61 samples, but in chunks of 5!
+```{r}
+chunk_size <- 5
+for(i in seq(1, length(fnFssm1), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(fnFssm1))
+  
+  filterAndTrim(fnFssm1[inds], fnFssm1.filtN[inds],
+                fnRssm1[inds], fnRssm1.filtN[inds],
+                maxN = 0, multithread = TRUE, compress = TRUE)
+}
+```
+
+diel samples:FiltN
+*check if files are in the FiltN folder in the diel fastqfiles ~ should chunk them in groups of 5, should have 36 x 2 files at the end = 72
+```{r}
+fnFsdi.filtN <- file.path(path2, "filtN", basename(fnFsdi)) # Put N-filtered files in filtN/ subdirectory
+fnRsdi.filtN <- file.path(path2, "filtN", basename(fnRsdi))
+
+chunk_size <- 5
+for(i in seq(1, length(fnFsdi), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(fnFsdi))
+  
+  filterAndTrim(fnFsdi[inds], fnFsdi.filtN[inds],
+                fnRsdi[inds], fnRsdi.filtN[inds],
+                maxN = 0, multithread = TRUE, compress = TRUE)
+}
+```
+
+okay now on to primer hits!
+
+
+~~if r crashes do this! 
+lets identify the filtered files in the filtN folder now
+sm
+```{r}
+# List all filtered forward and reverse reads
+fnFs.filtNsm <- sort(list.files(file.path(path1, "filtN"), pattern="_R1_16S_final.fastq", full.names = TRUE))
+fnRs.filtNsm <- sort(list.files(file.path(path1, "filtN"), pattern="_R2_16S_final.fastq", full.names = TRUE))
+
+```
+diel
+```{r}
+# List all filtered forward and reverse reads
+fnFs.filtNdi <- sort(list.files(file.path(path2, "filtN"), pattern="_R1_16S_final.fastq", full.names = TRUE))
+fnRs.filtNdi <- sort(list.files(file.path(path2, "filtN"), pattern="_R2_16S_final.fastq", full.names = TRUE))
+
+```
+
+
+7. Double check: Looking for hits of primers in any orientation
+*we want this to be 0 ~ if not then we cut the sequences with the primers!
+yay no primers!!
+
+sm
+```{r}
+primerHits <- function(primer, fn) {
+  # Counts number of reads in which the primer is found
+  nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits > 0))
+}
+
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFs.filtNsm[[4]]), 
+      FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = fnRs.filtNsm[[4]]), 
+      REV.ForwardReads = sapply(REV.orients, primerHits, fn = fnFs.filtNsm[[4]]), 
+      REV.ReverseReads = sapply(REV.orients, primerHits, fn = fnRs.filtNsm[[4]]))
+```
+yay!
+
+diel
+```{r}
+primerHits <- function(primer, fn) {
+  # Counts number of reads in which the primer is found
+  nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits > 0))
+}
+
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFs.filtNdi[[4]]), 
+      FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = fnRs.filtNdi[[4]]), 
+      REV.ForwardReads = sapply(REV.orients, primerHits, fn = fnFs.filtNdi[[4]]), 
+      REV.ReverseReads = sapply(REV.orients, primerHits, fn = fnRs.filtNdi[[4]]))
+```
+YAY
+
+8. TIME TO VISUALIZE THE RAW DATA!! QC plots
+a. Looking at quality profile R1 reads, first 25 samples*** 132 total 
+You are looking at where the line on the graphs begin to plummet (this is where the quality of the reads goes down) we want to cut prior to where the quality goes down. You should look at every single sample.
+
+SM FIRST
+
+forward
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(1:10)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(11:20)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(21:30)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(31:40)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(41:50)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(51:60)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(61:70)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNsm[c(71:77)]) 
+```
+
+
+reverse
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(1:10)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(11:20)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(21:30)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(31:40)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(41:50)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(51:60)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(61:70)]) 
+```
+
+```{r}
+plotQualityProfile(fnRs.filtNsm[c(71:77)]) 
+```
+**will truncate at 220 
+
+This next step takes a while ...  20-30 mins? 
+This is trimming based on quality profile plots cut off & uploading new, trimmed files into a folder (called trimmed) - to check if code is working look for files popping up in the new trimmed folder 
+
+truncLen=c(210,210), #specifies where to be truncated - leaves plenty of overlap
+maxN=0, #DADA does not allow ambiguous(N) bases, so 0 
+maxEE=c(2,2), #allow 2 expected errors in a read (for both forward & reverse reads)
+truncQ=2, #trims low quality bases from the ends of their reads (2 is threshold)
+rm.phix=TRUE, #remove reads matching phiX genome
+matchIDs=TRUE, #enforce matching between id-line sequence identifiers of F and R reads
+compress=TRUE, multithread=TRUE) #On Windows set multithread=FALSE
+
+```{r}
+print(fnFssm)
+print(fnRssm)
+```
+```{r}
+length(fnFssm)
+length(fnRssm)
+length(sample.namessm)
+length(fnFs.filtNsm)
+length(fnRs.filtNsm)
+```
+Filtering Reads to 225 bp based on QC plots above! 
+
+*need to run in chunks!
+```{r}
+# List forward and reverse read files
+fnFssm <- sort(list.files(path1, pattern="_R1_16S_final.fastq", full.names = TRUE))
+fnRssm <- sort(list.files(path1, pattern="_R2_16S_final.fastq", full.names = TRUE))
+
+# Extract sample names - since multiple names that could be repetitive, had to be more distinct with the naming  
+sample.namessm <- sapply(strsplit(basename(fnFssm), "_R1_"), `[`, 1)
+
+# Create output directory
+filt_path <- file.path(path1, "trimmed")
+if(!dir.exists(filt_path)) dir.create(filt_path)
+
+# Construct output file paths
+filtFssm <- file.path(filt_path, paste0(sample.namessm, "_F_filt.fastq.gz"))
+filtRssm <- file.path(filt_path, paste0(sample.namessm, "_R_filt.fastq.gz"))
+
+# Run filterAndTrim
+outsm <- filterAndTrim(fnFssm, filtFssm, fnRssm, filtRssm, 
+                     truncLen = c(220, 220),
+                     maxN = 0,
+                     maxEE = c(2, 2),
+                     truncQ = 2,
+                     rm.phix = TRUE,
+                     matchIDs = TRUE,
+                     compress = TRUE,
+                     multithread = TRUE)  # Use FALSE on Windows
+
+# Check and export results
+head(outsm)
+tail(outsm)
+write.csv(outsm, file = "outsm.csv", row.names = TRUE, quote = FALSE)
+
+```
+retry in chunks
+```{r}
+# List forward and reverse read files
+fnFssm <- sort(list.files(path1, pattern="_R1_16S_final.fastq", full.names = TRUE))
+fnRssm <- sort(list.files(path1, pattern="_R2_16S_final.fastq", full.names = TRUE))
+
+# Extract sample names
+sample.namessm <- sapply(strsplit(basename(fnFssm), "_R1_"), `[`, 1)
+
+# Create output directory
+filt_path <- file.path(path1, "trimmed")
+if(!dir.exists(filt_path)) dir.create(filt_path)
+
+# Construct output file paths
+filtFssm <- file.path(filt_path, paste0(sample.namessm, "_F_filt.fastq.gz"))
+filtRssm <- file.path(filt_path, paste0(sample.namessm, "_R_filt.fastq.gz"))
+
+# Initialize results object
+outsm <- data.frame()
+
+# Run in chunks
+chunk_size <- 5  # adjust if you have more memory (10 is fine too)
+for (i in seq(1, length(fnFssm), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(fnFssm))
+  
+  message("Processing samples ", inds[1], " to ", inds[length(inds)], " of ", length(fnFssm))
+  
+  out_chunk <- filterAndTrim(fnFssm[inds], filtFssm[inds],
+                             fnRssm[inds], filtRssm[inds],
+                             truncLen = c(220, 220),
+                             maxN = 0,
+                             maxEE = c(2, 2),
+                             truncQ = 2,
+                             rm.phix = TRUE,
+                             matchIDs = TRUE,
+                             compress = TRUE,
+                             multithread = TRUE)
+  
+  # Append results to main dataframe
+  outsm <- rbind(outsm, out_chunk)
+}
+
+# Check and export results
+head(outsm)
+tail(outsm)
+write.csv(outsm, file = "outsm.csv", row.names = TRUE, quote = FALSE)
+
+```
+OKAY NOW DIEL 
+
+QC plots first:
+SM FIRST
+
+forward
+```{r}
+plotQualityProfile(fnFs.filtNdi[c(1:10)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNdi[c(11:20)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNdi[c(21:30)]) 
+```
+
+```{r}
+plotQualityProfile(fnFs.filtNdi[c(31:36)]) 
+```
+we will stick with 220 
+
+**will truncate at 220 
+
+This next step takes a while ...  20-30 mins? 
+This is trimming based on quality profile plots cut off & uploading new, trimmed files into a folder (called trimmed) - to check if code is working look for files popping up in the new trimmed folder 
+
+truncLen=c(210,210), #specifies where to be truncated - leaves plenty of overlap
+maxN=0, #DADA does not allow ambiguous(N) bases, so 0 
+maxEE=c(2,2), #allow 2 expected errors in a read (for both forward & reverse reads)
+truncQ=2, #trims low quality bases from the ends of their reads (2 is threshold)
+rm.phix=TRUE, #remove reads matching phiX genome
+matchIDs=TRUE, #enforce matching between id-line sequence identifiers of F and R reads
+compress=TRUE, multithread=TRUE) #On Windows set multithread=FALSE
+
+```{r}
+print(fnFsdi)
+print(fnRsdi)
+```
+
+```{r}
+length(fnFsdi)
+length(fnRsdi)
+length(sample.namesdi)
+length(fnFs.filtNdi)
+length(fnRs.filtNdi)
+```
+
+retry in chunks
+```{r}
+# List forward and reverse read files
+fnFsdi <- sort(list.files(path2, pattern="_R1_16S_final.fastq", full.names = TRUE))
+fnRsdi <- sort(list.files(path2, pattern="_R2_16S_final.fastq", full.names = TRUE))
+
+# Extract sample names
+sample.namesdi <- sapply(strsplit(basename(fnFsdi), "_R1_"), `[`, 1)
+
+# Create output directory
+filt_path <- file.path(path2, "trimmed")
+if(!dir.exists(filt_path)) dir.create(filt_path)
+
+# Construct output file paths
+filtFsdi <- file.path(filt_path, paste0(sample.namesdi, "_F_filt.fastq.gz"))
+filtRsdi <- file.path(filt_path, paste0(sample.namesdi, "_R_filt.fastq.gz"))
+
+# Initialize results object
+outdi <- data.frame()
+
+# Run in chunks
+chunk_size <- 5  # adjust if you have more memory (10 is fine too)
+for (i in seq(1, length(fnFsdi), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(fnFsdi))
+  
+  message("Processing samples ", inds[1], " to ", inds[length(inds)], " of ", length(fnFsdi))
+  
+  out_chunk <- filterAndTrim(fnFsdi[inds], filtFsdi[inds],
+                             fnRsdi[inds], filtRsdi[inds],
+                             truncLen = c(220, 220),
+                             maxN = 0,
+                             maxEE = c(2, 2),
+                             truncQ = 2,
+                             rm.phix = TRUE,
+                             matchIDs = TRUE,
+                             compress = TRUE,
+                             multithread = TRUE)
+  
+  # Append results to main dataframe
+  outdi <- rbind(outdi, out_chunk)
+}
+
+# Check and export results
+head(outdi)
+tail(outdi)
+write.csv(outdi, file = "outdi.csv", row.names = TRUE, quote = FALSE)
+
+```
+
+*need to load filtFsdi and filtRsdi in from trimmed folder 
+*then start back up at error rates ********
+```{r}
+list.files(file.path(path1, "trimmed"))
+list.files(file.path(path2, "trimmed"))
+```
+
+
+*if r crashes run this! 
+```{r}
+filtFssm <- sort(list.files(file.path(path1, "trimmed"), pattern = "_F_filt.fastq.gz", full.names = TRUE))
+filtRssm <- sort(list.files(file.path(path1, "trimmed"), pattern = "_R_filt.fastq.gz", full.names = TRUE))
+sample.namessm <- sapply(strsplit(basename(filtFssm), "_F_filt.fastq.gz"), `[`, 1)
+```
+
+
+```{r}
+filtFsdi <- sort(list.files(file.path(path2, "trimmed"), pattern = "_F_filt.fastq.gz", full.names = TRUE))
+filtRsdi <- sort(list.files(file.path(path2, "trimmed"), pattern = "_R_filt.fastq.gz", full.names = TRUE))
+sample.namesdi <- sapply(strsplit(basename(filtFsdi), "_F_filt.fastq.gz"), `[`, 1)
+```
+
+**
+This will take 40 mins??
+```{r}
+errFsm <- learnErrors(filtFssm, multithread=TRUE) 
+errRsm <- learnErrors(filtRssm, multithread=TRUE)
+```
+123571360 total bases in 561688 reads from 3 samples will be used for learning the error rates.
+123571360 total bases in 561688 reads from 3 samples will be used for learning the error rates.
+
+This will take 40 mins
+```{r}
+errFdi <- learnErrors(filtFsdi, multithread=TRUE) 
+errRdi <- learnErrors(filtRsdi, multithread=TRUE)
+```
+105056380 total bases in 477529 reads from 3 samples will be used for learning the error rates.
+105056380 total bases in 477529 reads from 3 samples will be used for learning the error rates.
+
+# Save them to your working directory
+
+```{r}
+saveRDS(errFsm, file = "errFsm.rds")
+saveRDS(errRsm, file = "errRsm.rds")
+saveRDS(errFdi, file = "errFdi.rds")
+saveRDS(errRdi, file = "errRdi.rds")
+```
+
+*if r crashes run this! to get error rates back in! 
+```{r}
+errFsm <- readRDS("errFsm.rds")
+errRsm <- readRDS("errRsm.rds")
+errFdi <- readRDS("errFdi.rds")
+errRdi <- readRDS("errRdi.rds")
+
+```
+
+
+
+11. Visualizing estimated error rates
+- error rates should decline with increasing qual score
+- the red line is based on definition of quality score alone
+- theblack line is estimated error rate after convergence
+- dots are observed error rate for each quality score
+- you want the black dots to roughly fall along the black line 
+
+```{r}
+plotErrors(errFsm, nominalQ=TRUE) 
+plotErrors(errRsm, nominalQ=TRUE) 
+plotErrors(errFdi, nominalQ=TRUE) 
+plotErrors(errRdi, nominalQ=TRUE) 
+```
+*Everything looks reasonable (no strong deviations from black lines and black points), so we proceed with confidence
+
+
+
+~~~~~~ FROM HERE DOWN JUST SEASONAL MAT SAMPLES FIRST, BECAUSE SINCE A LOT OF SAMPLES MOST OF THIS HAD TO BE DONE ON THE COMPUTER CLUSTER 
+
+12. Deplicate Reads: 
+
+-  Dereplication in bioinformatics means grouping identical DNA sequences together and counting how many times each sequence appears. This helps speed up the analysis by avoiding repeating the same calculations for identical sequences : For example, if you have 100 copies of the same sequence, instead of treating each copy separately, dereplication counts it as one sequence with an abundance of 100.
+
+- In DADA2 it keeps track of the quality (or reliability) of each unique sequence. It calculates an average quality score for each sequence by considering the quality scores of all the copies. 
+
+-This helps DADA2 make fewer mistakes when it tries to figure out the true sequences from the noisy data generated by sequencing machines.
+*DADA2's denoising step can more effectively distinguish between true biological variants and sequencing artifacts
+
+- In simple terms, dereplication helps bioinformatics tools work faster by grouping identical sequences together, and DADA2 uses quality information to make better guesses about the real DNA sequences
+
+
+let's see if this works on here, if not will have to complete on the ondemand site for increased memory 
+
+will try on here 
+```{r}
+# Initialize empty lists
+derepFssm <- list()
+derepRssm <- list()
+
+chunk_size <- 2  # try 2 or 1 if memory is still tight
+
+for (i in seq(1, length(filtFssm), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(filtFssm))
+  
+  message("Dereplicating samples ", inds[1], " to ", inds[length(inds)], " of ", length(filtFssm))
+  
+  # Process current chunk
+  derep_chunk_F <- lapply(filtFssm[inds], derepFastq, verbose = TRUE)
+  derep_chunk_R <- lapply(filtRssm[inds], derepFastq, verbose = TRUE)
+  
+  # Append to main lists
+  derepFssm <- c(derepFssm, derep_chunk_F)
+  derepRssm <- c(derepRssm, derep_chunk_R)
+}
+
+# Assign sample names after all chunks are processed
+names(derepFssm) <- sample.names
+names(derepRssm) <- sample.names
+
+```
+
+
+^ this still didnt work, lets try again
+```{r}
+# Load or initialize progress --------------------------------------------
+if (file.exists("derepFssm_partial.rds")) {
+  derepFssm <- readRDS("derepFssm_partial.rds")
+  derepRssm <- readRDS("derepRssm_partial.rds")
+  start <- length(derepFssm) + 1
+  message("Resuming from sample ", start)
+} else {
+  derepFssm <- list()
+  derepRssm <- list()
+  start <- 1
+}
+
+# Set chunk size
+chunk_size <- 1  # safest; can increase to 2 if stable
+
+# Dereplicate in chunks ---------------------------------------------------
+for (i in seq(start, length(filtFssm), by = chunk_size)) {
+  inds <- i:min(i + chunk_size - 1, length(filtFssm))
+  
+  message("Dereplicating samples ", inds[1], " to ", inds[length(inds)], " of ", length(filtFssm))
+  
+  # Dereplicate forward and reverse reads for current chunk
+  derep_chunk_F <- lapply(filtFssm[inds], derepFastq, verbose = TRUE)
+  derep_chunk_R <- lapply(filtRssm[inds], derepFastq, verbose = TRUE)
+  
+  # Add new chunk results to main lists
+  derepFssm <- c(derepFssm, derep_chunk_F)
+  derepRssm <- c(derepRssm, derep_chunk_R)
+  
+  # 💾 Save progress after every chunk
+  saveRDS(derepFssm, "derepFssm_partial.rds")
+  saveRDS(derepRssm, "derepRssm_partial.rds")
+  
+  gc()  # clear memory between chunks
+}
+
+# Name the derep objects ---------------------------------------------------
+names(derepFssm) <- sample.names
+names(derepRssm) <- sample.names
+
+# Save final results -------------------------------------------------------
+saveRDS(derepFssm, "derepFssm_final.rds")
+saveRDS(derepRssm, "derepRssm_final.rds")
+
+```
+
+crashed at sample 60, but will read in partial derep samples! 
+
+*this is first 60 samples of FORWARD reads
+```{r}
+derepFssm <- readRDS("derepFssm_partial.rds")
+length(derepFssm)
+```
+
+
+
+redoing first 60 reverse reads! 
+```{r}
+# Initialize reverse reads list
+derepRssm <- list()
+
+# Chunk size safest = 1
+chunk_size <- 1
+
+for (i in 1:60) {
+  message("Dereplicating reverse read sample ", i, " of 60")
+  derepR <- derepFastq(filtRssm[[i]], verbose = TRUE)
+  derepRssm[[i]] <- derepR
+  
+  # Save progress after each sample
+  saveRDS(derepRssm, "derepRssm_partial.rds")
+  gc()
+}
+
+names(derepRssm)[1:60] <- sample.namessm[1:60]
+
+# Save partial reverse reads
+saveRDS(derepRssm, "derepRssm_partial.rds")
+
+```
+```{r}
+length(derepRssm)
+```
+
+```{r}
+file.copy("derepRssm_partial.rds", "derepRssm_partial_backup.rds")
+file.copy("derepFssm_partial.rds", "derepFssm_partial_backup.rds")
+```
+
+
+
+*if r crashes reload the first 67 forward and reverse dereplicated reads! 
+```{r}
+derepFssm <- readRDS("derepFssm_partial2.rds")
+length(derepFssm)
+```
+okay 67 reads in for forward! 
+
+```{r}
+derepRssm <- readRDS("derepRssm_partial.rds")
+length(derepRssm)
+```
+
+need to do 7 more reverse reads
+```{r}
+# Double-check length before continuing
+length(derepRssm)  # should be 60
+```
+
+
+redoing first 61-67 reverse reads! 
+```{r}
+# Redoing reverse reads for samples 61–67 safely ----------------------------
+
+# Load existing partial file (first 60 samples)
+derepRssm <- readRDS("derepRssm_partial.rds")
+
+# Double-check length before continuing
+length(derepRssm)  # should be 60
+
+# Chunk size safest = 1
+chunk_size <- 1
+
+# Loop over samples 61–67
+for (i in 61:67) {
+  message("Dereplicating reverse read sample ", i, " of 67")
+  
+  # Dereplicate this sample
+  derepR <- derepFastq(filtRssm[[i]], verbose = TRUE)
+  derepRssm[[i]] <- derepR
+  
+  # Save progress as a *new* file after each iteration
+  saveRDS(derepRssm, "derepRssm_partial2.rds")
+  
+  # Free memory
+  gc()
+}
+
+# Assign sample names (if not already assigned)
+names(derepRssm) <- sample.namessm[1:length(derepRssm)]
+
+# Save the final version to the new file
+saveRDS(derepRssm, "derepRssm_partial2.rds")
+
+```
+
+CRASHED ^
+
+
+
+.....
+
+later 67-77 for both forward and reverse? 
+```{r}
+# Continue dereplication for samples 61–68
+chunk_size <- 1
+
+for (i in 61:68) {
+  message("Dereplicating sample ", i, " of 68")
+  
+  # Forward read
+  derepF <- derepFastq(filtFssm[[i]], verbose = TRUE)
+  derepFssm[[i]] <- derepF
+  
+  # Reverse read
+  derepR <- derepFastq(filtRssm[[i]], verbose = TRUE)
+  derepRssm[[i]] <- derepR
+  
+  # Save progress after each sample (new filenames for safety)
+  saveRDS(derepFssm, "derepFssm_partial2.rds")
+  saveRDS(derepRssm, "derepRssm_partial2.rds")
+  
+  gc()
+}
+
+# Name the full lists
+names(derepFssm) <- sample.namessm
+names(derepRssm) <- sample.namessm
+
+# Save final results
+saveRDS(derepFssm, "derepFssm_final.rds")
+saveRDS(derepRssm, "derepRssm_final.rds")
+
+```
+
+CRASHED^ 
+
+progress update; have 67 forward reads dereplicated in derepFssm.partial2 and 60 forward reads dereplicated in derepRssm.partial 
+
+looking at memory
+```{r}
+# Total memory used by R objects
+sum(sapply(ls(), function(x) object.size(get(x))))
+
+```
+```{r}
+# List top 5 largest objects
+sort(sapply(ls(), function(x) object.size(get(x))), decreasing = TRUE)[1:5] / 1024^2
+```
+
+```{r}
+system("vm_stat")
+
+```
+
+read in derep files
+```{r}
+derepFssm <- readRDS("derepFssm_final.rds")
+```
+
+```{r}
+derepRssm <- readRDS("derepRssm_final.rds")
+```
+
+STEPS TO UPLOAD SAMPLES AND MAKE WORKING ON THE CLUTERS FASTER!  
+
+
+*trimmed folder loaded on demand already
+1. uploading things from trimmed folder (filtFssm files):
+# Define the path to your trimmed FASTQ files
+path1 <- "/proj/mccoylab/Maddy/trimmed"
+
+# List and sort the forward and reverse reads
+filtFssm <- sort(list.files(path1, pattern = "_F_filt.fastq.gz", full.names = TRUE))
+filtRssm <- sort(list.files(path1, pattern = "_R_filt.fastq.gz", full.names = TRUE))
+
+# Generate sample names from the forward read filenames
+ sample.namessm <- sapply(strsplit(basename(filtFssm), "_F_filt.fastq.gz"), `[`, 1)
+ 
+# Quick check
+length(filtFssm)  #number of forward reads should be 77
+
+length(filtRssm)  #number of reverse reads should be 77
+
+head(sample.namessm) #checking sample names look right
+ 
+2. now need to upload (dereplicated reads ~ all 77 samples ~ final file) (derepFssm)
+
+*derepfiles loaded ondemand already
+#codebelow
+derepFssm <- readRDS("derepFssm_final.rds")
+derepRssm <- readRDS("derepRssm_final.rds")
+
+
+3. need to upload the error rates 
+#codebelow
+errFsm <- readRDS("errFsm.rds")
+errRsm <- readRDS("errRsm.rds")
+
+*for this you only need derepFssm files (final) and errFsm files loaded into r environment
+4. get the dada files using the dereplicated samples + the error rates *will take a while
+#codebelow
+dadaFssm <- dada(derepFssm, err=errFsm, multithread=TRUE) *DONE
+saveRDS(dadaFssm <- dada(derepFssm, err=errFsm, multithread=TRUE), "dadaFssm.rds") #code that loaded it and saved it right after *DONE
+code for reverse dada
+dadaRssm <- dada(derepRssm, err=errRsm, multithread=TRUE)*DONE
+
+#to load in
+dadaFssm <- readRDS("dadaFssm.rds")
+dadaRssm <- readRDS("dadaRssm.rds")
+
+
+
+#Inspecting the Returned dada-class object
+dadaFssm[[1]]
+dadaRssm[[1]]
+
+>dadaFssm[[1]]
+dada-class: object describing DADA2 denoising results
+3539 sequence variants were inferred from 97665 input unique sequences.
+Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+> dadaRssm[[1]]
+dada-class: object describing DADA2 denoising results
+3595 sequence variants were inferred from 95801 input unique sequences.
+Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+
+
+5.merge pairs reads
+mergers <- mergePairs(dadaFssm, derepFssm, dadaRssm, derepRssm, minOverlap = 12,
+  maxMismatch = 0,
+  returnRejects = FALSE,
+  propagateCol = character(0),
+  justConcatenate = FALSE,
+  trimOverhang = FALSE,
+  verbose = TRUE)
+  
+#Inspect the merger data.frame from the first sample
+head(mergers[[1]])
+# Save the merged pairs to an RDS file
+saveRDS(mergers, "mergers_final.rds")
+
+mergers <- mergePairs(dadaFssm, derepFssm, dadaRssm, derepRssm, minOverlap = 12,
+  maxMismatch = 0,
+  returnRejects = FALSE,
+  propagateCol = character(0),
+  justConcatenate = FALSE,
+  trimOverhang = FALSE,
+  verbose = TRUE)
+ saveRDS(mergers, "mergers_final.rds") 
+ 
+ #read in merged pairs now
+ mergers <- readRDS("mergers_final.rds")
+ 
+ 
+ 15. Construct Sequence table!!
+
+***SEQTAB MADE USING MERGERS! ~ a higher-resolution version of the “OTU table” produced by classical methods. 
+
+seqtab <- makeSequenceTable(mergers)
+dim(seqtab)
+>dim(seqtabsm)
+[1]    77 24860
+>saveRDS(seqtab, file="seqtab_SM_16S.rds")
+>write.csv(seqtab, file="seqtab_SM_16S.csv")
+
+# Inspect distribution of sequence lengths
+table(nchar(getSequences(seqtab)))
+plot(table(nchar(getSequences(seqtab)))) #real variants appear to be right in that 240-270 window
+*all reads within 250bp, plot looks fine 
+
+#making seqtab2
+seqtab2sm <- seqtab[,nchar(colnames(seqtabsm)) %in% seq(245,265)] #fairly conservative with length
+saveRDS(seqtab2sm, file="seqtab2_SM_16S.rds")
+write.csv(seqtab2sm, file="seqtab2_SM_16S.csv")
+ 
+#removing chimeras
+seqtab.nochimsm <- removeBimeraDenovo(seqtab2sm, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochimsm) 
+> dim(seqtab.nochimsm) 
+[1]    77 23724
+
+saveRDS(seqtab.nochimsm, file="seqtab.nochim_SM_16S.rds")
+write.csv(seqtab.nochimsm, file="seqtab.nochim_SM_16S.csv")
+sum(seqtab.nochimsm)/sum(seqtab2sm)
+>sum(seqtab.nochimsm)/sum(seqtab2sm)
+[1] 0.9773455
+
+#track sequence reads
+
+17. Track Sequence Reads 
+A final check of progressive, this will look at the number of reads that made it through each step in the pipeline. Sanity check! 
+
+getN <- function(x) sum(getUniques(x))
+track <- cbind(outsm, sapply(dadaFssm, getN), sapply(mergers, getN), rowSums(seqtab2sm), rowSums(seqtab.nochimsm))
+colnames(track) <- c("input", "filtered", "denoised", "merged", "tabled", "nonchim")
+rownames(track) <- sample.namessm
+head(track)
+tail(track)
+
+write.csv(track,file="SM_16S_readstats.csv",row.names=TRUE,quote=FALSE)
+> head(track)
+              input filtered denoised merged tabled nonchim
+MM_A24SM_A1  199481   184401   172963 153914 153840  150369
+MM_A24SM_A10 241835   224333   217114 207829 207559  205931
+MM_A24SM_A2  166951   152954   144864 131870 131793  128770
+MM_A24SM_A3  170012   155142   144337 126184 126161  123470
+MM_A24SM_A4  194424   177443   170563 160695 160575  158571
+MM_A24SM_A5  165508   152224   144125 131809 131763  129393
+
+>tail(track)
+          input filtered denoised merged tabled nonchim
+MM_SM_E4  40566    29647    26616  23122  23113   22913
+MM_SM_E5  95879    69762    64901  58300  58295   57590
+MM_SM_E6 128913    94036    89977  82662  82652   81977
+MM_SM_E7  78428    50171    47719  43548  43531   42915
+MM_SM_E8  60114    39124    36373  33278  33248   32432
+MM_SM_E9 153359   107306   103979  95387  95354   92581
+
+
+#Assign taxonomy
+
+library(dada2)
+ seqtab.nochimsm<- readRDS("seqtab.nochim_SM_16S.rds")
+```{r}
+ seqtab.nochimsm<- readRDS("seqtab.nochim_SM_16S.rds")
+```
+ 
+taxasm <- assignTaxonomy(seqtab.nochimsm, "~/proj/mccoylab/Maddy/silva_nr99_v138.1_train_set.fa", multithread=TRUE)
+
+
+# used this code
+taxasm <- assignTaxonomy(seqtab.nochimsm,
+                         file.path(path, "silva_nr99_v138.1_train_set.fa"),
+                         multithread = TRUE)
+saveRDS(taxasm, file="SM_16S_taxa.rds") 
+
+
+#METADATA
+
+View(taxasm)
+> samples.out <- rownames(seqtab.nochimsm)
+> View(samples.out)
+> samples.out
+ [1] "MM_A24SM_A1"  "MM_A24SM_A10" "MM_A24SM_A2"  "MM_A24SM_A3"  "MM_A24SM_A4"  "MM_A24SM_A5"  "MM_A24SM_A6" 
+ [8] "MM_A24SM_A7"  "MM_A24SM_A8"  "MM_A24SM_A9"  "MM_J25SM_A11" "MM_J25SM_A12" "MM_J25SM_B1"  "MM_J25SM_B2" 
+[15] "MM_J25SM_B3"  "MM_J25SM_B4"  "MM_NEG_F4"    "MM_NEG_H12"   "MM_SM_A1"     "MM_SM_A10"    "MM_SM_A11"   
+[22] "MM_SM_A12"    "MM_SM_A2"     "MM_SM_A3"     "MM_SM_A4"     "MM_SM_A5"     "MM_SM_A6"     "MM_SM_A7"    
+[29] "MM_SM_A8"     "MM_SM_A9"     "MM_SM_B1"     "MM_SM_B10"    "MM_SM_B11"    "MM_SM_B12"    "MM_SM_B2"    
+[36] "MM_SM_B3"     "MM_SM_B4"     "MM_SM_B5"     "MM_SM_B6"     "MM_SM_B7"     "MM_SM_B8"     "MM_SM_B9"    
+[43] "MM_SM_C1"     "MM_SM_C10"    "MM_SM_C11"    "MM_SM_C12"    "MM_SM_C2"     "MM_SM_C3"     "MM_SM_C4"    
+[50] "MM_SM_C5"     "MM_SM_C6"     "MM_SM_C7"     "MM_SM_C8"     "MM_SM_C9"     "MM_SM_D1"     "MM_SM_D10"   
+[57] "MM_SM_D11"    "MM_SM_D12"    "MM_SM_D2"     "MM_SM_D3"     "MM_SM_D4"     "MM_SM_D5"     "MM_SM_D6"    
+[64] "MM_SM_D7"     "MM_SM_D8"     "MM_SM_D9"     "MM_SM_E1"     "MM_SM_E10"    "MM_SM_E11"    "MM_SM_E2"    
+[71] "MM_SM_E3"     "MM_SM_E4"     "MM_SM_E5"     "MM_SM_E6"     "MM_SM_E7"     "MM_SM_E8"     "MM_SM_E9"    
+> samdfsm <- read.csv("SM_SAMDF.csv")
+> head(samdfsm)
+     Sample.ID Experiment  Month Year Site
+1  MM_A24SM_A1   Seasonal August 2024   TM
+2 MM_A24SM_A10   Seasonal August 2024   SB
+3  MM_A24SM_A2   Seasonal August 2024   TM
+4  MM_A24SM_A3   Seasonal August 2024   TM
+5  MM_A24SM_A4   Seasonal August 2024   TM
+6  MM_A24SM_A5   Seasonal August 2024   TM
+> rownames(samdf) <- samdfsm$Sample
+
+*made sure samples matched up
+> rownames(samdfsm) <- samdfsm$Sample
+> View(samdfsm)
+> View(seqtab.nochimsm)
+> row.names(samdfsm) <- samdfsm$Sample
+> pssm <- phyloseq(otu_table(seqtab.nochimsm, taxa_are_rows=FALSE), 
++                sample_data(samdfsm), 
++                tax_table(taxasm)) 
+
+
+
+
+#hand off to phyloseq and saved! 
+*had to download phyloseq
+> pssm <- phyloseq(otu_table(seqtab.nochimsm, taxa_are_rows=FALSE), 
++                sample_data(samdfsm), 
++                tax_table(taxasm)) 
+> pssm
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 23724 taxa and 77 samples ]
+sample_data() Sample Data:       [ 77 samples by 5 sample variables ]
+tax_table()   Taxonomy Table:    [ 23724 taxa by 6 taxonomic ranks ]
+
+
+#added in nutrient data to the samdf metdata (samdsm2)
+
+pssm2 <- phyloseq(otu_table(seqtab.nochimsm, taxa_are_rows=FALSE), 
+               sample_data(samdfsm2), 
+               tax_table(taxasm)) 
+saveRDS(pssm2, "pssm2_16S.rds")
+
+
+
+WILL CONTINUE WITH PHYLOSEQ ON LOCAL ~ LETS TRY TO GET DIEL TO PHYLOSEQ STEPS ALSO NOW! 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+DIEL SAMPLES! *on cluster so that it goes faster
+
+derep code: 
+derepFsdi <- derepFastq(filtFsdi, verbose=TRUE)
+derepRsdi <- derepFastq(filtRsdi, verbose=TRUE)
+saveRDS(derepFsdi, file = "derepFsdi.rds")
+saveRDS(derepRsdi, file = "derepRsdi.rds")
+*to read in:
+derepFsdi <- readRDS("derepFsdi.rds")
+derepRsdi <- readRDS("derepRsdi.rds")
+
+upload error rates:
+errFdi <- readRDS("errFdi.rds")
+errRdi <- readRDS("errRdi.rds")
+
+
+dada2: 
+saveRDS(dadaFsdi <- dada(derepFsdi, err=errFdi, multithread=TRUE), "dadaFsdi.rds")  *DONE*
+saveRDS(dadaRsdi <- dada(derepRsdi, err=errRdi, multithread=TRUE), "dadaRsdi.rds") *DONE*
+
+*to read in:
+dadaFsdi <- readRDS("dadaFsdi.rds") 
+dadaRsdi <- readRDS("dadaRsdi.rds")
+
+Inspecting the Returned dada-class object:
+dadaFsdi[[1]]
+dadaRsdi[[1]]
+
+> dadaFsdi[[1]]
+dada-class: object describing DADA2 denoising results
+2256 sequence variants were inferred from 69189 input unique sequences.
+Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+> dadaRsdi[[1]]
+dada-class: object describing DADA2 denoising results
+2264 sequence variants were inferred from 69386 input unique sequences.
+Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+> 
+
+merge pairs reads:
+mergers2 <- mergePairs(dadaFsdi, derepFsdi, dadaRsdi, derepRsdi, minOverlap = 12,
+  maxMismatch = 0,
+  returnRejects = FALSE,
+  propagateCol = character(0),
+  justConcatenate = FALSE,
+  trimOverhang = FALSE,
+  verbose = TRUE)
+  
+Construct Sequence table:
+seqtabdi <- makeSequenceTable(mergers2)
+dim(seqtabdi)
+> dim(seqtabdi)
+[1]    36 13695
+
+saveRDS(seqtabdi, file="seqtab_DIEL_16S.rds")
+write.csv(seqtabdi, file="seqtab_DIEL_16S.csv")
+
+Inspect distribution of sequence lengths:
+table(nchar(getSequences(seqtabdi)))
+plot(table(nchar(getSequences(seqtabdi)))) #real variants appear to be right in that 240-270 window
+*all reads within 250bp! plot looks fine!
+
+making seqtab2:
+seqtab2di <- seqtabdi[,nchar(colnames(seqtabdi)) %in% seq(245,265)] 
+saveRDS(seqtab2di, file="seqtab2_DIEL_16S.rds")
+write.csv(seqtab2di, file="seqtab2_DIEL_16S.csv")
+ 
+removing chimeras:
+seqtab.nochimdi <- removeBimeraDenovo(seqtab2di, method="consensus", multithread=TRUE, verbose=TRUE) 
+dim(seqtab.nochimdi) 
+> dim(seqtab.nochimdi) 
+[1]    36 12392
+
+saveRDS(seqtab.nochimdi, file="seqtab.nochim_DIEL_16S.rds")
+write.csv(seqtab.nochimdi, file="seqtab.nochim_DIEL_16S.csv")
+sum(seqtab.nochimdi)/sum(seqtab2di)
+
+>sum(seqtab.nochimdi)/sum(seqtab2di)
+> sum(seqtab.nochimdi)/sum(seqtab2di)
+[1] 0.9599649
+
+*need to upload outdi
+*need to delete first column of outdi
+outdi <- read.csv("outdi.csv") 
+
+*need to get sample names:
+read
+sample.namesdi <- sapply(strsplit(basename(filtFsdi), "_"), `[`, 1)
+
+track Sequence Reads:
+getN <- function(x) sum(getUniques(x))
+track <- cbind(outdi, sapply(dadaFsdi, getN), sapply(mergers2, getN), rowSums(seqtab2di), rowSums(seqtab.nochimdi))
+colnames(track) <- c("input", "filtered", "denoised", "merged", "tabled", "nonchim")
+rownames(track) <- sample.namesdi
+head(track)
+tail(track)
+
+write.csv(track,file="DIEL_16S_readstats.csv",row.names=TRUE,quote=FALSE)
+> head(track)
+             input filtered denoised merged tabled nonchim
+MM_DIEL_C10 181542   157826   151491 141902 141900  137278
+MM_DIEL_C11 130818   120240   114761 107392 107247  105335
+MM_DIEL_C12 215914   199463   191948 177785 177752  170294
+MM_DIEL_C5  164478   138938   132855 123671 123656  120217
+MM_DIEL_C6  145574   127663   124092 117730 117626  116597
+MM_DIEL_C7  145239   129139   123147 115455 115398  114130
+> tail(track)
+            input filtered denoised merged tabled nonchim
+MM_DIEL_E8 156697   143867   134420 117126 116998  107541
+MM_DIEL_E9 278631   259792   249838 234404 234247  228915
+MM_DIEL_F1 153015   141631   133538 119730 119658  116229
+MM_DIEL_F2 168813   155342   143861 126205 126197  118306
+MM_DIEL_F3 155615   142259   135428 121548 121407  112636
+MM_NEG_F4   60111    53376    53153  51628  51610   50173
+> 
+
+assign taxonomy:
+path <- "/proj/mccoylab/Maddy"
+taxadi <- assignTaxonomy(seqtab.nochimdi,
+                         file.path(path, "silva_nr99_v138.1_train_set.fa"),
+                         multithread = TRUE)
+saveRDS(taxadi, file="DIEL_16S_taxa.rds") 
+
+
+metdata match: 
+samples.out <- rownames(seqtab.nochimdi)
+samdfdi<-read.csv("DI.SAMDF.csv") 
+View(samdfdi)
+View(seqtab.nochimdi) 
+*need to ensure order of samples matches up*
+rownames(samdfdi) <- samdfdi$Sample
+
+phyloseq install:
+if (!requireNamespace("BiocManager", quietly = TRUE))
+ install.packages("BiocManager")
+ BiocManager::install("phyloseq")
+ 
+psdi <- phyloseq(otu_table(seqtab.nochimdi, taxa_are_rows=FALSE), 
+             sample_data(samdfdi), 
+             tax_table(taxadi)) 
+             saveRDS(psdi, file = "psdi.rds")
+> psdi
+
+
+seqtabnochimdi2 <-readRDS("seqtab_nochimdi_cleaned.rds")
+> View(seqtabnochimdi2)
+> rownames(samdfdi) <- samdfdi$Sample
+> View(samdfdi)
+> rownames(samdfdi)
+ [1] "MM_DIEL_C10" "MM_DIEL_C11" "MM_DIEL_C12" "MM_DIEL_C5"  "MM_DIEL_C6"  "MM_DIEL_C7"  "MM_DIEL_C8"  "MM_DIEL_C9"  "MM_DIEL_D1" 
+[10] "MM_DIEL_D10" "MM_DIEL_D11" "MM_DIEL_D12" "MM_DIEL_D2"  "MM_DIEL_D3"  "MM_DIEL_D4"  "MM_DIEL_D5"  "MM_DIEL_D6"  "MM_DIEL_D7" 
+[19] "MM_DIEL_D8"  "MM_DIEL_D9"  "MM_DIEL_E1"  "MM_DIEL_E10" "MM_DIEL_E11" "MM_DIEL_E12" "MM_DIEL_E2"  "MM_DIEL_E3"  "MM_DIEL_E4" 
+[28] "MM_DIEL_E5"  "MM_DIEL_E6"  "MM_DIEL_E7"  "MM_DIEL_E8"  "MM_DIEL_E9"  "MM_DIEL_F1"  "MM_DIEL_F2"  "MM_DIEL_F3"  "MM_NEG_F4"  
+> rownames(seqtabnochimdi2)
+ [1] "MM_DIEL_C10" "MM_DIEL_C11" "MM_DIEL_C12" "MM_DIEL_C5"  "MM_DIEL_C6"  "MM_DIEL_C7"  "MM_DIEL_C8"  "MM_DIEL_C9"  "MM_DIEL_D1" 
+[10] "MM_DIEL_D10" "MM_DIEL_D11" "MM_DIEL_D12" "MM_DIEL_D2"  "MM_DIEL_D3"  "MM_DIEL_D4"  "MM_DIEL_D5"  "MM_DIEL_D6"  "MM_DIEL_D7" 
+[19] "MM_DIEL_D8"  "MM_DIEL_D9"  "MM_DIEL_E1"  "MM_DIEL_E10" "MM_DIEL_E11" "MM_DIEL_E12" "MM_DIEL_E2"  "MM_DIEL_E3"  "MM_DIEL_E4" 
+[28] "MM_DIEL_E5"  "MM_DIEL_E6"  "MM_DIEL_E7"  "MM_DIEL_E8"  "MM_DIEL_E9"  "MM_DIEL_F1"  "MM_DIEL_F2"  "MM_DIEL_F3"  "MM_NEG_F4"  
+> library(phyloseq)
+> View(taxadi)
+> View(taxadi)
+> psdi <- phyloseq(otu_table(seqtabnochimdi2, taxa_are_rows=FALSE), 
++                  sample_data(samdfdi), 
++                  tax_table(taxadi)) 
+> saveRDS(psdi, file = "psdi.rds")
+> View(psdi)
+*save phyloseq back into workingd directory on desktop, see if we can continue on here for both seasonal mat/diel now that we are at the phyloseq steps!*
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+attempting back to local, uploading phyloseq objects! 
+
+
+SM!
+```{r}
+pssm <-readRDS("pssm2_16S.rds")
+```
+
+
+```{r}
+pssm
+```
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 23724 taxa and 77 samples ]
+sample_data() Sample Data:       [ 77 samples by 9 sample variables ]
+tax_table()   Taxonomy Table:    [ 23724 taxa by 6 taxonomic ranks ]
+
+DIEL!
+```{r}
+psdi <-readRDS("psdi.rds")
+```
+
+
+```{r}
+psdi
+```
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 12392 taxa and 36 samples ]
+sample_data() Sample Data:       [ 36 samples by 4 sample variables ]
+tax_table()   Taxonomy Table:    [ 12392 taxa by 6 taxonomic ranks ]
+
+read in metadata
+```{r}
+samdfsm <- read.csv("SM_SAMDF2.csv")
+sandfdi <- read.csv("DIEL_SAMDF.csv")
+```
+
+TAX.GLOM function is aggregating similar ASV into taxonomic ranks (phylum, class, order, family, genus). Since I am interested in comparing microbiomes between treatments then I change my x to "Treatment." from my metadata. 
+*Multiple reads can match an ASV - this is how you get abundance data. (ASV is the specific taxa being identified). This step 
+
+takes a few minutes to run
+```{r}
+library(phyloseq)
+```
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ps_glomfam <- tax_glom(pssm, "Family")
+ps_glomgen <- tax_glom(pssm, "Genus")
+```
+
+```{r}
+plot_bar(ps_glomfam, x="Month", fill="Family")+
+  theme(legend.position="none")
+
+
+plot_bar(ps_glomgen, x="Month", fill="Genus")+
+  theme(legend.position="none")
+```
+2 aprils, need to fix 
+
+```{r}
+seqtab.nochimsm <-readRDS("seqtab.nochim_SM_16S.rds")
+```
+
+```{r}
+samdfsm <- read.csv("SM_SAMDF2.csv")
+```
+
+```{r}
+View(samdfsm)
+```
+
+
+```{r}
+View(taxasm)
+View(seqtab.nochimsm)
+```
+
+
+```{r}
+taxasm <-readRDS("SM_16S_taxa.rds")
+```
+
+```{r}
+library(phyloseq)
+```
+
+
+
+```{r}
+unique(samdfsm$Month)
+
+```
+```{r}
+# See the unique Month values inside the phyloseq object
+unique(sample_data(pssm)$Month)
+
+```
+
+```{r}
+# Access sample_data and trim whitespace
+sample_data(pssm)$Month <- trimws(as.character(sample_data(pssm)$Month))
+```
+```{r}
+unique(sample_data(pssm)$Month)
+
+```
+```{r}
+rownames(samdfnew) <- samdfsm$Sample.ID
+```
+
+```{r}
+class(seqtab.nochimsm)
+```
+
+```{r}
+# Double-check rownames alignment
+all(rownames(seqtab.nochimsm) %in% rownames(samdfnew))
+
+```
+
+```{r}
+samdfnew <- read.csv("SM_SAMDF4.csv")
+```
+
+FINAL PHYLOSEQ CODE FOR SM
+```{r}
+pssm2 <- phyloseq(
+  otu_table(seqtab.nochimsm, taxa_are_rows = FALSE),
+  sample_data(samdfnew),
+  tax_table(taxasm)
+)
+```
+
+```{r}
+View(pssm2)
+```
+
+```{r}
+unique(sample_data(pssm2)$Month)
+
+```
+
+```{r}
+saveRDS(pssm2, file = "pssm2.rds")
+
+```
+
+```{r}
+unique(sample_data(psdi)$Diel_Time)
+```
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+OKAY JESUS FUCK NOW WE ARE FINALL BACK ON TRACK 
+~ FROM HERE ON OUT THE PHYLOSEQ OBJECTS WE ARE USING ARE:
+~ For seasonal mats: pssm2 (or pssm2.rds)
+~ For diel:psdi (or psdi.rds)
+
+back to tax agglomeration for seasonal mats: 
+
+```{r}
+smps_glomfam <- tax_glom(pssm2, "Family")
+plot_bar(smps_glomfam, x="Month", fill="Family")+
+  theme(legend.position="none")
+```
+tax agglomeration for diel: 
+
+```{r}
+dips_glomfam <- tax_glom(psdi, "Family")
+plot_bar(dips_glomfam, x="Month_Year", fill="Family")+
+  theme(legend.position="none")
+```
+okay na is smallest in both so continue on! 
+
+final seqtab files used to make the following ps files !!!!!!!!!
+
+seqtab.nochimsm "seqtab.nochim_SM_16S.rds" ~ pssm2 "pssm2.rds"
+seqtab.nochimdi "seqtab_nochimdi_cleaned.rds" ~psdi "psdi.rds"
+
+```{r}
+seqtab.nochimdi <- readRDS("seqtab_nochimdi_cleaned.rds")
+seqtab.nochimsm <- readRDS ("seqtab.nochim_SM_16S.rds")
+```
+
+Making the ASV names shorter
+```{r}
+idssm <- paste0("sq", seq(1, length(colnames(seqtab.nochimsm))))
+idsdi <- paste0("sq", seq(1, length(colnames(seqtab.nochimdi))))
+```
+
+
+A) First Renaming Stuff:
+This assigns the values in 'ids' to be the column names of the 'seqtab.nochim' table. Creating taxa2 by combining taxa with its row names. Now assigning values in ids to be the names of the taxa2 table. 
+
+Essentially, this is renaming stuff.
+
+seqtab.nochim ~ has the sequences (shortened to ids) as the columns, the samples as the rows, and the abundance is what is displayed
+
+SM
+```{r}
+colnames(seqtab.nochimsm)<-idssm
+taxasm <- cbind(taxasm, rownames(taxasm)) #retaining raw sequence info before renaming
+rownames(taxasm)<-idssm
+```
+
+DIEL
+```{r}
+colnames(seqtab.nochimdi)<-idsdi
+taxadi <- cbind(taxadi, rownames(taxadi)) #retaining raw sequence info before renaming
+rownames(taxadi)<-idsdi
+```
+
+UPDATED phyloseq object
+
+This code constructs a phyloseq object named ps by combining the ASV table "seqtab.nochim", sample metadata "samdf", and NEW taxonomy table "taxa2" 
+
+SM
+```{r}
+pssm.new <- phyloseq(otu_table(seqtab.nochimsm, taxa_are_rows=FALSE), 
+               sample_data(samdfsm), 
+               tax_table(taxasm))
+pssm.new
+```
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 23724 taxa and 77 samples ]
+sample_data() Sample Data:       [ 77 samples by 9 sample variables ]
+tax_table()   Taxonomy Table:    [ 23724 taxa by 7 taxonomic ranks ]
+
+DIEL
+```{r}
+#samdfdi <- read.csv("DIEL_SAMDF.csv")
+rownames(samdfdi) <- samdfdi$Sample.ID
+```
+
+
+DIEL
+```{r}
+psdi.new <- phyloseq(otu_table(seqtab.nochimdi, taxa_are_rows=FALSE), 
+               sample_data(samdfdi), 
+               tax_table(taxadi))
+psdi.new
+```
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 12392 taxa and 36 samples ]
+sample_data() Sample Data:       [ 36 samples by 4 sample variables ]
+tax_table()   Taxonomy Table:    [ 12392 taxa by 7 taxonomic ranks ]
+
+Saving new (still contaminated) ps files, in case r crashes!!!!! 
+
+```{r}
+saveRDS(pssm.new, file = "ps.sm.update.rds")
+saveRDS(psdi.new, file = "ps.diel.update.rds")
+```
+
+B) Now, removing mitochondria, chloroplasts & non-bacteria taxa.
+
+SM
+First, identifying contaminants ~
+```{r}
+ps.mitosm <- subset_taxa(pssm.new, (Family=="Mitochondria"))
+ps.mitosm
+```
+470 mito in seasonal mat samples 
+
+DI
+First, identifying contaminants ~
+```{r}
+ps.mitodi <- subset_taxa(psdi.new, (Family=="Mitochondria"))
+ps.mitodi
+```
+208 mito in diel samples 
+
+```{r}
+ps.chlorsm <- subset_taxa(pssm.new, (Order=="Chloroplast"))
+ps.chlorsm
+
+ps.chlordi <- subset_taxa(psdi.new, (Order=="Chloroplast"))
+ps.chlordi
+```
+156 chloro for sm
+33 chloro for diel
+
+*not bacteria next
+```{r}
+ps.notbactsm <- subset_taxa(pssm.new, (Kingdom!="Bacteria") | is.na(Kingdom))
+ps.notbactsm
+ps.notbactdi <- subset_taxa(psdi.new, (Kingdom!="Bacteria") | is.na(Kingdom))
+ps.notbactdi
+```
+1987 taxa ~ not bacterial SM
+1139 taxa ~ not bacterial DIEL
+
+```{r}
+ps.nomitoSM <- subset_taxa(pssm.new, (Family!="Mitochondria") | is.na(Family))
+ps.nomitoSM
+ps.nomitoDI <- subset_taxa(psdi.new, (Family!="Mitochondria") | is.na(Family))
+ps.nomitoDI
+```
+23724 -  470 = 23254
+12392 -  208 = 12184
+
+```{r}
+ps.nochlorSM <- subset_taxa(ps.nomitoSM, (Order!="Chloroplast") | is.na(Order))
+ps.nochlorSM
+ps.nochlorDI <- subset_taxa(ps.nomitoDI, (Order!="Chloroplast") | is.na(Order))
+ps.nochlorDI
+
+```
+23254 -  156 = 23098
+12184 -  33 =  12151
+
+*all mitochondria and chloroplasts removed
+
+```{r}
+ps.clean.SM <- subset_taxa(ps.nochlorSM, (Kingdom=="Bacteria"))
+ps.clean.SM
+ps.clean.DI <- subset_taxa(ps.nochlorDI, (Kingdom=="Bacteria"))
+ps.clean.DI
+```
+
+23098 - 1987 = 21111
+12151 - 1139 = 11012
+
+```{r}
+saveRDS(ps.clean.SM, file = "sm.psclean.rds")
+saveRDS(ps.clean.DI, file = "diel.psclean.rds")
+```
+
+C) Just for funsies - This is how much archaea was identified 
+```{r}
+ps.archsm <- subset_taxa(ps.nomitoSM, (Kingdom=="Archaea"))
+ps.archsm
+ps.archdi <- subset_taxa(ps.nomitoDI, (Kingdom=="Archaea"))
+ps.archdi
+```
+
+1979 archaea in sm
+1137 archaea in diel
+
+
+Removing negative controls from samples!
+
+Installing decontam package: 
+```{r}
+#BiocManager::install("decontam") #might already be installed
+```
+
+```{r}
+library(decontam)
+```
+
+This code first converts sample data (ps.clean) to dataframe. 
+Then it calculates the library size (total number of reads) for each sample in ps.clean and adds a new column 'library size' into the dataframe 'df'
+Then df is ordered in ascending order by library size
+The df$index creates a new column 'index' that contains sequential numbers from 1 to the number of rows in the dataframe (x axis in plot)
+
+ggplot: creates a scatterplot. Index is the x axis, library size is the y axis, and colors are the points by the treatment variable (this is because this is the variable we are comparing microbiome data to each other)
+
+SEASONAL MATS
+```{r}
+df <- as.data.frame(sample_data(ps.clean.SM)) # Put sample_data into a ggplot-friendly data.frame
+df$LibrarySize <- sample_sums(ps.clean.SM)
+df <- df[order(df$LibrarySize),]
+df$Index <- seq(nrow(df))
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample.ID)) + 
+  geom_point()
+```
+
+```{r}
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Month)) + 
+  geom_point()
+```
+August samples have higher library size, neg controls (na) are lowest, this is good! 
+
+DIEL SAMPLES
+
+```{r}
+df <- as.data.frame(sample_data(ps.clean.DI)) # Put sample_data into a ggplot-friendly data.frame
+df$LibrarySize <- sample_sums(ps.clean.DI)
+df <- df[order(df$LibrarySize),]
+df$Index <- seq(nrow(df))
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample.ID)) + 
+  geom_point()
+```
+```{r}
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Diel_Time)) + 
+  geom_point()
+```
+
+SEASONAL MATS: 
+
+Contaminant Table:
+-The first line creates a new column 'is.neg' in the object of 'ps.clean'.
+
+-The next line uses "isContaminant" function to identify potential contaminants in ps.clean - puts .5 as a threshold (if a feature has a 50% or more probability of being a contaminant, it is removed)
+
+-The last line creates a table of the contaminant column in the new contamdf.prev dataframe. This takes a minute to run. 
+```{r}
+# Mark both negative controls
+sample_data(ps.clean.SM)$is.neg <- sample_data(ps.clean.SM)$Sample %in% c("MM_NEG_F4", "MM_NEG_H12")
+
+# Run contaminant detection using the prevalence method
+contamdf.prev <- isContaminant(ps.clean.SM, neg = "is.neg", threshold = 0.5)
+
+# View summary of how many ASVs were identified as contaminants
+table(contamdf.prev$contaminant)
+
+```
+10 ASVs were classified as contaminants 
+
+The first line applies a transformation to the sample counts in the ps.clean (either presence or absent)
+- The next line is identifying the neg controls in the ps.pa object 
+- The final line is identifying the samples that are not negative controls 
+Summary: transforming to presence/absence data and subsetting samples that are neg controls vs all other samples (only neg control samples are Sample==MM_NEG_F4)
+
+
+
+```{r}
+# Convert to presence/absence
+ps.pa<- transform_sample_counts(ps.clean.SM, function(abund) 1 * (abund > 0))
+
+# Subset negative controls (both)
+ps.pa.neg <- prune_samples(
+  sample_data(ps.pa)$Sample %in% c("MM_NEG_F4", "MM_NEG_H12"),
+  ps.pa
+)
+
+# Subset all positive (non-negative) samples
+ps.pa.pos<- prune_samples(
+  !(sample_data(ps.pa)$Sample %in% c("MM_NEG_F4", "MM_NEG_H12")),
+  ps.pa
+)
+
+```
+
+
+Make data.frame of prevalence in positive and negative samples
+Make data.frame of prevalence in positive and negative samples
+```{r}
+df.pa <- data.frame(pa.pos=taxa_sums(ps.pa.pos), pa.neg=taxa_sums(ps.pa),
+                    contaminant=contamdf.prev$contaminant)
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+```
+Even though isContaminant() flagged 10 contaminants, only 7 are visible because:
+The other 3 ASVs have zero presence in both positive and negative subsets (so they’re not plotted). this is fine!
+
+This is removing contaminant taxa (identified above) from all your samples (from the phyloseq object)
+```{r}
+ps.clean1.sm <- prune_taxa(!contamdf.prev$contaminant,ps.clean.SM)
+```
+ps.clean1 has contaminants removed ~ but still the negative controls in there 
+```{r}
+ps.clean.SM
+ps.clean1.sm
+```
+(10 contaminants removed ~ THESE TAXA WERE REMOVED FROM ALL SAMPLES) 
+
+Now, you are removing your negative controls as well - because we do not need these anymore
+```{r}
+ps.cleaner.sm <- prune_samples(
+  !(sample_data(ps.clean1.sm)$Sample %in% c("MM_NEG_F4", "MM_NEG_H12")),
+  ps.clean1.sm
+)
+ps.cleaner.sm
+```
+ps.cleaner.sm: 
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 21101 taxa and 75 samples ]
+sample_data() Sample Data:       [ 75 samples by 10 sample variables ]
+tax_table()   Taxonomy Table:    [ 21101 taxa by 7 taxonomic ranks ]
+
+*not rarefying, just need to save files: 
+
+SAVING FILES
+```{r}
+saveRDS(ps.cleaner.sm, file ="sm.ps.cleaner.rds") #IMPORTANT ONE USED FOR STATS
+```
+
+This is turning the cleaned asv data (ps.cleaner) along with the metadata into an otu table, and then a dataframe. This is to help with future r manipulations and steps.
+```{r}
+seqtab.cleaner.sm <- data.frame(ps.cleaner.sm@otu_table)
+samdf.cleaner.sm <- data.frame(ps.cleaner.sm@sam_data)
+```
+
+```{r}
+saveRDS(seqtab.cleaner.sm, "seqtab.cleaner.sm.rds")
+write.csv(seqtab.cleaner.sm, "seqtab.cleaner.sm.csv")
+write.csv(samdf.cleaner.sm, "samdf.cleaner.sm.csv", row.names = FALSE)
+```
+*not rarefying so done with SM preprocessing reads! woohoo! 
+
+
+
+
+
+DIEL SAMPLES ~ FINAL STEPS
+
+~~~~~~
+
+
+Contaminant Table:
+-The first line creates a new column 'is.neg' in the object of 'ps.clean'.
+
+-The next line uses "isContaminant" function to identify potential contaminants in ps.clean - puts .5 as a threshold (if a feature has a 50% or more probability of being a contaminant, it is removed)
+
+-The last line creates a table of the contaminant column in the new contamdf.prev dataframe. This takes a minute to run. 
+```{r}
+# Mark both negative controls
+sample_data(ps.clean.DI)$is.neg <- sample_data(ps.clean.DI)$Sample %in% c("MM_NEG_F4")
+
+# Run contaminant detection using the prevalence method
+contamdf.prev <- isContaminant(ps.clean.DI, neg = "is.neg", threshold = 0.5)
+
+# View summary of how many ASVs were identified as contaminants
+table(contamdf.prev$contaminant)
+
+```
+5 ASVs were classified as contaminants 
+
+The first line applies a transformation to the sample counts in the ps.clean (either presence or absent)
+- The next line is identifying the neg controls in the ps.pa object 
+- The final line is identifying the samples that are not negative controls 
+Summary: transforming to presence/absence data and subsetting samples that are neg controls vs all other samples (only neg control samples are Sample==MM_NEG_F4)
+
+```{r}
+# Convert to presence/absence
+ps.pa<- transform_sample_counts(ps.clean.DI, function(abund) 1 * (abund > 0))
+
+# Subset negative controls (both)
+ps.pa.neg <- prune_samples(
+  sample_data(ps.pa)$Sample %in% c("MM_NEG_F4"),
+  ps.pa
+)
+
+# Subset all positive (non-negative) samples
+ps.pa.pos<- prune_samples(
+  !(sample_data(ps.pa)$Sample %in% c("MM_NEG_F4")),
+  ps.pa
+)
+
+```
+
+
+Make data.frame of prevalence in positive and negative samples
+Make data.frame of prevalence in positive and negative samples
+```{r}
+df.pa <- data.frame(pa.pos=taxa_sums(ps.pa.pos), pa.neg=taxa_sums(ps.pa),
+                    contaminant=contamdf.prev$contaminant)
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+```
+5 ASV shown, perfect
+
+This is removing contaminant taxa (identified above) from all your samples (from the phyloseq object)
+```{r}
+ps.clean1.di <- prune_taxa(!contamdf.prev$contaminant,ps.clean.DI)
+```
+ps.clean1 has contaminants removed ~ but still the negative controls in there 
+```{r}
+ps.clean.DI
+ps.clean1.di
+```
+(5 contaminants removed ~ THESE TAXA WERE REMOVED in ALL SAMPLES) 
+
+Now, you are removing your negative controls as well - because we do not need these anymore
+```{r}
+ps.cleaner.diel <- prune_samples(
+  !(sample_data(ps.clean1.di)$Sample %in% c("MM_NEG_F4")),
+  ps.clean1.di
+)
+ps.cleaner.diel
+```
+ps.cleaner.diel: 
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 11007 taxa and 35 samples ]
+sample_data() Sample Data:       [ 35 samples by 5 sample variables ]
+tax_table()   Taxonomy Table:    [ 11007 taxa by 7 taxonomic ranks ]
+
+*not rarefying, just need to save files: 
+
+SAVING FILES
+```{r}
+saveRDS(ps.cleaner.diel, file ="diel.ps.cleaner.rds") #IMPORTANT ONE USED FOR STATS
+```
+
+This is turning the cleaned asv data (ps.cleaner) along with the metadata into an otu table, and then a dataframe. This is to help with future r manipulations and steps.
+```{r}
+seqtab.cleaner.diel <- data.frame(ps.cleaner.diel@otu_table)
+samdf.cleaner.diel <- data.frame(ps.cleaner.diel@sam_data)
+```
+
+```{r}
+saveRDS(seqtab.cleaner.diel, "seqtab.cleaner.diel.rds")
+write.csv(seqtab.cleaner.diel, "seqtab.cleaner.diel.csv")
+write.csv(samdf.cleaner.diel, "samdf.cleaner.diel.csv", row.names = FALSE)
+```
+*not rarefying so done with DIEL preprocessing reads! woohoo! 
