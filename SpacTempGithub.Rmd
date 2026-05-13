@@ -1,0 +1,435 @@
+---
+title: "SpacTempGithub"
+output: html_document
+date: "2026-05-13"
+---
+```{r}
+getwd()
+```
+
+pipelines are as follows:
+- for phenological (seasonal sampling) + diel sampling bioinformatic pipeline - file is titled "sm.di.pipeline.Rmd
+- for IESS bioinformatic pipeline - file is titled "ie.pipeline.Rmd" 
+
+uploading ps.cleaner (raw files) 
+iess.ps.cleaner = ps.cleaner for IESS samples (internal/external spatial survey)
+ps.ps.cleaner = ps.cleaner for PS samples (phenological)
+di.ps.cleaner = ps.cleaner for DI samples (diel)
+
+raw counts..need to clr tranform them
+```{r}
+iess.ps.cleaner <- readRDS("CH1_IE_16S_ps.cleaner.RDS")
+ps.ps.cleaner <- readRDS("sm1.ps.cleaner.rds")
+di.ps.cleaner <- readRDS("diel.ps.cleaner.rds")
+```
+
+ensuring raw counts
+```{r}
+otu_table(iess.ps.cleaner)[1:5, 1:5]
+otu_table(ps.ps.cleaner)[1:5, 1:5]
+otu_table(di.ps.cleaner)[1:5, 1:5]
+```
+
+clr transformation for each 
+```{r}
+iess.ps.cleaner.clr <- microbiome::transform(iess.ps.cleaner,'clr')
+iess.seqtab.clr <- data.frame(otu_table(iess.ps.cleaner.clr))
+
+ps.ps.cleaner.clr <- microbiome::transform(ps.ps.cleaner,'clr')
+ps.seqtab.clr <- data.frame(otu_table(ps.ps.cleaner.clr))
+
+di.ps.cleaner.clr <- microbiome::transform(di.ps.cleaner,'clr')
+di.seqtab.clr <- data.frame(otu_table(di.ps.cleaner.clr))
+```
+
+ensuring clr tranformation and saving dataframes
+```{r}
+otu_table(iess.ps.cleaner.clr)[1:5, 1:5]
+otu_table(ps.ps.cleaner.clr)[1:5, 1:5]
+otu_table(di.ps.cleaner.clr)[1:5, 1:5]
+```
+good^
+```{r}
+saveRDS(iess.ps.cleaner.clr, "iess.ps.cleaner.clr.rds")
+saveRDS(ps.ps.cleaner.clr, "ps.ps.cleaner.clr.rds")
+saveRDS(di.ps.cleaner.clr, "di.ps.cleaner.clr.rds")
+```
+all saved & uploaded into github to start back here! 
+
+Now let's start with the stats
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SURVEY STATS & Figures~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note: Figure 2 Map (not made in r, made on arcmap gis)
+
+PCA 1 - GROUP BY MAT
+```{r}
+pca.df <- read.csv("pca.df.update.csv")
+```
+
+```{r}
+# create factor for grouping
+pca.df$mat_group <- factor(pca.df$mat, labels = c("No mats", "Mats"))
+```
+
+```{r}
+# select only numeric environmental variables
+env_vars <- pca.df %>%
+  select(cond, sal, TDS, pH, RDO.Sat, temp, DOC)
+```
+
+```{r}
+# run PCA (scale is important)
+pca <- prcomp(env_vars, scale. = TRUE)
+```
+
+```{r}
+biplot(pca)
+```
+Figure 3A - labels manually added later 
+```{r}
+library(factoextra)
+pca_mat1.2 <- fviz_pca_biplot(
+  pca,
+  geom.ind = "point",
+  habillage = pca.df$mat_group,
+  addEllipses = TRUE,
+  ellipse.level = 0.95,
+  label = "none",   # <-- removes labels, keeps arrows
+  col.var = "black",
+  pointsize = 3,
+  alpha.ind = 0.8,
+  repel = TRUE,
+  legend.title = "Mat Presence",
+  title = "PCA of Water Quality Parameters",
+  select.var = list(name = c("pH", "cond", "sal", "DOC", "temp", "RDO.Sat"))
+) +
+  theme_minimal(base_size = 14)
+
+pca_mat1.2
+
+```
+Notes on PCA1: 
+
+- Dim1 = 57.7% of the variation
+- Dim2 = 22.2% of the variation
+- together, almost 80% 
+
+- Mats (teal triangles) cluster more toward the right side of Dim1
+- No mats (red circles) are more spread out and include more of the left side
+- mat presence is associated with a particular water chemistry signature, not random conditions
+
+- Variables pointing to the RIGHT (positive Dim1): cond (conductivity), TDS, sal (salinity), pH (slightly up-right)
+
+- These are tightly grouped  ~  positively correlated with each other
+- So Dim1 is salinity / ionic strength gradient.
+
+-Sites with mats tend to occur where: higher conductivity, higher TDS, higher salinity, slightly higher pH
+
+- Variables pointing DOWN (negative Dim2): temp, RDO.Sat (dissolved oxygen saturation)
+- So Dim2 is mostly a temperature / oxygen gradient.
+- Lower Dim2 values = warmer water, lower DO saturation
+
+- DOC arrow points left
+- DOC is opposite of salinity/TDS/cond
+- So:High DOC = low salinity & conductivity, Low DOC = higher salinity waters
+- makes sense!
+
+```{r}
+#save as PDF
+ggsave(
+  filename = "pca.mat.nolabels.pdf",
+  plot = pca_mat1.2,
+  width = 8,
+  height = 6
+)
+```
+
+statistical test to back this up: PERMANOVA
+```{r}
+env_vars <- pca.df[, c("cond", "TDS", "sal", "pH", "DOC", "temp", "RDO.Sat")]
+library(vegan)
+env_scaled <- scale(env_vars)
+env_dist <- dist(env_scaled, method = "euclidean")
+adonis2(env_dist ~ mat_group, 
+        data = pca.df,
+        permutations = 9999)
+```
+not stat supported by a PERMANOVA boo hoo
+beta dispersion assumption passes ~
+```{r}
+#BETADISPERSIONCHECK
+disp1 <- betadisper(env_dist, pca.df$mat_group)
+anova(disp1)
+```
+PCA 2 - GROUP BY MONTH!
+
+```{r}
+# create factor for grouping
+pca.df$month_group <- factor(
+  pca.df$month,
+  levels = c("Mar_2023", "June_2023", "July_2023"),
+  labels = c("March", "June", "July")
+)
+
+# select only numeric environmental variables
+env_vars <- pca.df %>%
+  select(cond, sal, TDS, pH, RDO.Sat, temp, DOC)
+
+# run PCA (scale is important)
+pca <- prcomp(env_vars, scale. = TRUE)
+```
+
+```{r}
+biplot(pca)
+```
+Figure 3B ~ labels manually fixed later
+```{r}
+pca_month <- fviz_pca_biplot(
+  pca,
+  geom.ind = "point",
+  habillage = pca.df$month_group,
+  addEllipses = TRUE,
+  ellipse.level = 0.95,
+  label = "var",   
+  col.var = "black",
+  pointsize = 3,
+  alpha.ind = 0.8,
+  repel = TRUE,
+  legend.title = "Month",
+  title = "PCA of Water Quality Parameters",
+  select.var = list(name = c("pH", "cond", "TDS", "sal", "DOC", "temp", "RDO.Sat"))
+) +
+  theme_minimal(base_size = 14)
+
+pca_month
+
+```
+```{r}
+# Optionally, save as PDF
+ggsave(
+  filename = "pca.month.nolabel.pdf",
+  plot = pca_month,
+  width = 8,
+  height = 6
+)
+```
+
+
+statistical test to back this up: PERMANOVA
+```{r}
+env_vars <- pca.df[, c("cond", "TDS", "sal", "pH", "DOC", "temp", "RDO.Sat")]
+library(vegan)
+env_scaled <- scale(env_vars)
+env_dist <- dist(env_scaled, method = "euclidean")
+adonis2(env_dist ~ month_group, 
+        data = pca.df,
+        permutations = 9999)
+
+#BETADISPERSIONCHECK
+disp2 <- betadisper(env_dist, pca.df$month_group)
+anova(disp2)
+#passes beta dispersion result!
+
+#pariwise test
+# install if needed
+# install.packages("devtools")
+# devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+
+library(pairwiseAdonis)
+
+# Run pairwise PERMANOVA
+pairwise.adonis2(env_dist ~ month_group, data = pca.df, permutations = 9999, p.adjust.m = "BH")
+
+```
+differences seen between 3 sampling months!
+
+PCA 1 - GROUP BY WATER TYPE
+```{r}
+# create factor for grouping
+pca.df$water_group <- factor(
+  pca.df$water,
+  levels = c("sound", "lagoon", "channel", "river estuary"),
+  labels = c("S", "L", "C", "RE")
+)
+```
+
+Figure 3C ~ labels manually added later
+```{r}
+pca_water <- fviz_pca_biplot(
+  pca,
+  geom.ind = "point",
+  habillage = pca.df$water_group,
+  addEllipses = FALSE,
+  #ellipse.level = 0.95,
+  label = "none",   
+  col.var = "black",
+  pointsize = 3,
+  alpha.ind = 0.8,
+  repel = TRUE,
+  legend.title = "Water Type",
+  title = "",
+  select.var = list(name = c("pH", "cond", "TDS", "sal", "DOC", "temp", "RDO.Sat"))
+) +
+  theme_minimal(base_size = 14)
+
+pca_water
+```
+
+To save
+```{r}
+# Optionally, save as PDF
+ggsave(
+  filename = "pca.water.nolab.noellipses.pdf",
+  plot = pca_water,
+  width = 8,
+  height = 6
+)
+```
+
+```{r}
+adonis2(env_dist ~ water_group, 
+        data = pca.df,
+        permutations = 9999)
+
+#BETADISPERSIONCHECK
+disp5 <- betadisper(env_dist, pca.df$water_group)
+anova(disp5)
+
+# Run pairwise PERMANOVA
+#pairwise.adonis2(env_dist ~ month_group, data = pca.df, permutations = 9999, p.adjust.m = "BH")
+```
+*not stat sig different based on water type~ beta disp passes
+
+GROUP BY REGION (NEARBY/WATER CLUMPING SPOTS)
+```{r}
+library(dplyr)
+
+# create factor for geographic grouping
+pca.df <- pca.df %>%
+  mutate(site_group = case_when(
+    site %in% c("HH") ~ "Western_Sound",
+    site %in% c("JI") ~ "Eastern_Sound",
+    site %in% c("MM", "SBE", "SBC", "SB") ~ "Central_Lagoon_Sound",
+    site %in% c("TM", "BS", "FM") ~ "Northern_Lagoon_Sound_Channel",
+    site %in% c("PI", "TI") ~ "Northern_River_Estuary",
+    TRUE ~ "Other"
+  ))
+
+pca.df$site_group <- factor(pca.df$site_group,
+                            levels = c("Western_Sound",
+                                       "Eastern_Sound",
+                                       "Central_Lagoon_Sound",
+                                       "Northern_Lagoon_Sound_Channel",
+                                       "Northern_River_Estuary"),
+                            labels = c("WS",
+                                       "ES",
+                                       "CLS",
+                                       "NLSC",
+                                       "NRE"))
+
+
+```
+ 
+Figure 3D ~ labels manually added later
+```{r}
+pca_loc <- fviz_pca_biplot(
+  pca,
+  geom.ind = "point",
+  habillage = pca.df$site_group,
+  addEllipses = FALSE,
+  label = "none",   
+  col.var = "black",
+  pointsize = 3,
+  alpha.ind = 0.8,
+  repel = TRUE,
+  legend.title = "region",
+  title = "",
+  select.var = list(name = c("pH", "cond", "TDS", "sal", "DOC", "temp", "RDO.Sat"))
+) +
+  theme_minimal(base_size = 14)
+
+pca_loc
+```
+To save
+```{r}
+# Optionally, save as PDF
+ggsave(
+  filename = "pca.loc.nolab.noellipses.pdf",
+  plot = pca_loc,
+  width = 8,
+  height = 6
+)
+```
+ 
+stats check 
+```{r}
+adonis2(env_dist ~ site_group, 
+        data = pca.df,
+        permutations = 9999)
+
+#BETADISPERSIONCHECK
+disp6 <- betadisper(env_dist, pca.df$site_group)
+anova(disp6)
+
+# Run pairwise PERMANOVA
+#pairwise.adonis2(env_dist ~ month_group, data = pca.df, permutations = 9999, p.adjust.m = "BH")
+```
+*not stat sig different based on region ~ beta disp passes
+
+putting plot together ~ figure 3 final!
+
+
+
+```{r}
+library(cowplot)
+pca.top <-cowplot::plot_grid(
+   pca_mat1.2,
+   pca_month,
+  nrow = 1,
+  align = "h",
+  axis = "tb")
+pca.top
+```
+
+```{r}
+pca.bottom <- cowplot::plot_grid(
+   pca_water,
+   pca_loc,
+  nrow = 1,
+  align = "h",
+  axis = "tb")
+pca.bottom
+```
+```{r}
+library(cowplot)
+final.pca <- cowplot::plot_grid(
+pca.top,
+pca.bottom,
+  nrow = 2,
+  align = "h",
+  axis = "tb")
+
+```
+
+```{r}
+final.pca
+```
+```{r}
+ggsave(
+  filename = "final.pca.pdf",
+  plot = final.pca,
+  width = 10,
+  height = 10,
+  device = cairo_pdf
+)
+
+```
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IESS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+
+
+
+
+
