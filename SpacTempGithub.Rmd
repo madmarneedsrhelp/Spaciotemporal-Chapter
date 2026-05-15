@@ -3,6 +3,25 @@ title: "SpacTempGithub"
 output: html_document
 date: "2026-05-13"
 ---
+
+loading libraries
+```{r}
+library(stringr)
+library(dplyr)
+library(stats)
+library(ggplot2)
+library(ggpubr)
+library(vegan)
+library(cowplot)
+library(tidyverse)
+library(phyloseq)
+library(microbiome)
+library("funfuns")
+library(pairwiseAdonis)
+library(viridis)
+library("microViz")
+```
+
 ```{r}
 getwd()
 ```
@@ -57,7 +76,7 @@ saveRDS(di.ps.cleaner.clr, "di.ps.cleaner.clr.rds")
 all saved & uploaded into github to start back here! 
 
 Now let's start with the stats
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SURVEY STATS & Figures~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~SURVEY STATS & Figures~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note: Figure 2 Map (not made in r, made on arcmap gis)
 
 PCA 1 - GROUP BY MAT
@@ -424,12 +443,136 @@ ggsave(
 
 ```
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IESS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IESS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```{r}
+iess.seqtab <- data.frame(otu_table(iess.ps.cleaner))
+iess.dist.all <- vegdist(iess.seqtab, method = "euclidean")
+```
+
+extract metadata
+```{r}
+iess.samdf <- data.frame(sample_data(iess.ps.cleaner))
+```
+
+Beta Dispersion!
+```{r}
+iess.bet.all1 <- betadisper(iess.dist.all,iess.samdf$Sample.Type)
+anova(iess.bet.all1) 
+
+iess.bet.all2 <- betadisper(iess.dist.all,iess.samdf$Site)
+anova(iess.bet.all2) 
+```
+Not significant p=.1002, .9643
+
+Beta Diversity
+```{r}
+iess.samdf$Sample.Type <- as.factor(iess.samdf$Sample.Type)
+iess.samdf$Site <- as.factor(iess.samdf$Site)
+adonis2(iess.dist.all ~ Sample.Type * Site , data=iess.samdf, permutations=9999)
+```
+Alpha Diversity!
+alpha diversity dataframe set up: 
+how did we make these? 
+alpha_diversity<- data.frame(estimate_richness(ps.cleaner, split=TRUE, measures=c("Shannon","InvSimpson","Observed")))
+alpha_diversity$Evenness <- alpha_diversity$Shannon / log(alpha_diversity$Observed)
+
+^did this for each experiment and saved dataframes to be uploaded below 
+ps.cleaner phyloseq object should not have transformed data (should use raw or minimally processed data for this)
+*if included below then the model passes assumptions + significant results 
+
+```{r}
+iess.alpha <- data.frame(estimate_richness(iess.ps.cleaner, split=TRUE, measures=c("Shannon","InvSimpson","Observed")))
+iess.alpha$Evenness <- iess.alpha$Shannon / log(iess.alpha$Observed)
+
+sample_metadata <- data.frame(sample_data(iess.ps.cleaner))
+iess.alpha <- cbind(sample_metadata, iess.alpha)
+
+write.csv(iess.alpha,"iess.alpha.csv")
+```
+
+*next time just read in iess.alpha
+model for shannon, richness, evenness, invsimpson
+
+which model type? 
+
+the 1|Mat accounts for samples within mats not being truly independent, especially important for iess experiment
+*only included stat sig models, but ran these for each alpha div stat
+*no need for interactions between variables 
+```{r}
+iess.alpha.2 <- lmer(InvSimpson ~ Site + Sample.Type + (1|Mat) , data = iess.alpha, REML = FALSE)
+summary(iess.alpha.2)
+```
+```{r}
+# Plot residuals against fitted values
+plot(residuals(iess.alpha.2) ~ fitted(iess.alpha.2))
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals(iess.alpha.2))
+
+# Q-Q plot of residuals
+qqnorm(residuals(iess.alpha.2))
+qqline(residuals(iess.alpha.2))
+plot_model(iess.alpha.2, type = 'diag')
+#passes assumptions
+
+```
+passes model assumptions
+```{r}
+iess.alpha.3 <- lmer(Evenness ~ Site + Sample.Type + (1|Mat) , data = iess.alpha, REML = FALSE)
+summary(iess.alpha.3)
+```
+
+```{r}
+# Plot residuals against fitted values
+plot(residuals(iess.alpha.3) ~ fitted(iess.alpha.3))
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals(iess.alpha.3))
+
+# Q-Q plot of residuals
+qqnorm(residuals(iess.alpha.3))
+qqline(residuals(iess.alpha.3))
+plot_model(iess.alpha.3, type = 'diag')
+#passes assumptions
+
+```
+passes model assumptions
+
+just to ensure which one is higher 
+```{r}
+library(ggplot2)
+
+ggplot(iess.alpha, aes(x = Sample.Type, y = Evenness, color = Site)) +
+  geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.3) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8)) +
+  theme_classic() +
+  labs(x = "Sample Type", y = "Evenness")
+
+
+ggplot(iess.alpha, aes(x = Sample.Type, y = InvSimpson, color = Site)) +
+  geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.3) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8)) +
+  theme_classic() +
+  labs(x = "Sample Type", y = "InvSimpson")
+```
+*internal richness and diversity is higher
+
+
+
+Diff Abund! 
+
+
+Bar plot!
+
+
+Nutrient Stats/correlations! 
 
 
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 
