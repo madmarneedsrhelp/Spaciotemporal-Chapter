@@ -556,20 +556,527 @@ ggplot(iess.alpha, aes(x = Sample.Type, y = InvSimpson, color = Site)) +
   labs(x = "Sample Type", y = "InvSimpson")
 ```
 *internal richness and diversity is higher
-
-
+*plots above not included in paper, purely for result visualization
 
 Diff Abund! 
+(1) sample type
+```{r}
+ie.diff.abund1 <- ancombc2(
+  data = iess.ps.cleaner,      # your phyloseq object
+  tax_level = "Family",      # or "Genus", etc.
+  fix_formula = "Sample.Type",  # variable to test
+  p_adj_method = "holm",
+  group = "Sample.Type",        # group variable for pairwise tests
+  struc_zero = TRUE,         # detects true absences
+  neg_lb = TRUE,
+  em_control = list(
+    tol = 1e-5,
+    max_iter = 100,
+    sensitivity = TRUE
+  ),
+  alpha = 0.05,
+  global = TRUE
+)
+```
+```{r}
+#structural zero results (need to clean up in excel)
+View(ie.diff.abund1$zero_ind)
+#write.csv(ie.diff.abund1$zero_ind, "ie.diff.abund1_strzeros.csv", row.names = TRUE)
+#sensitivity results (scores are low, this is why we negate global and pairwise results and focus on the robust structural zero results above)
+View(ie.diff.abund1$pseudo_sens_tab)
+#write.csv(ie.diff.abund1$pseudo_sens_tab, "ie.diff.abund1_sens.csv", row.names = TRUE)
+```
+
+(1) site
+```{r}
+ie.diff.abund2 <- ancombc2(
+  data = iess.ps.cleaner,      # your phyloseq object
+  tax_level = "Family",      # or "Genus", etc.
+  fix_formula = "Site",  # variable to test
+  p_adj_method = "holm",
+  group = "Site",        # group variable for pairwise tests
+  struc_zero = TRUE,         # detects true absences
+  neg_lb = TRUE,
+  em_control = list(
+    tol = 1e-5,
+    max_iter = 100,
+    sensitivity = TRUE
+  ),
+  alpha = 0.05,
+  global = TRUE
+)
+```
+```{r}
+#structural zero results (need to clean up in excel)
+View(ie.diff.abund2$zero_ind)
+#write.csv(ie.diff.abund2$zero_ind, "ie.diff.abund2_strzeros.csv", row.names = TRUE)
+#sensitivity results (scores are low, this is why we negate global and pairwise results and focus on the robust structural zero results above)
+View(ie.diff.abund2$pseudo_sens_tab)
+#write.csv(ie.diff.abund2$pseudo_sens_tab, "ie.diff.abund2_sens.csv", row.names = TRUE)
+```
 
 
-Bar plot!
+Nutrient Stats/correlations! iess.alpha (has nutrient data) 
 
 
-Nutrient Stats/correlations! 
+~look at differences of TOM, TOC, TN between sample types (internal vs external samples) &  across sites
+
+(1) TOM
+
+# Organic Matter
+mod_OM <- lmer(X..Organic.Matter ~ Sample.Type + Site + (1|Mat),
+               data = iess.alpha)
+#assumptions
+# Plot residuals against fitted values
+plot(residuals(mod_OM) ~ fitted(mod_OM))
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals(mod_OM))
+
+# Q-Q plot of residuals
+qqnorm(residuals(mod_OM))
+qqline(residuals(mod_OM))
+plot_model(mod_OM, type = 'diag')
+#does not pass so wilcoxin paired test
+`
+
+~ Using wilcoxin test for TOM because PAIRED internal/external samples & lme model did not pass assumptions 
+```{r}
+wilcox.test(X..Organic.Matter ~ Sample.Type,
+            paired = TRUE,
+            data = iess.alpha)
+
+wilcox.test(X..Organic.Matter ~ Site,
+            paired = TRUE,
+            data = iess.alpha)
+```
+```{r}
+#not adding to paper
+ggplot(iess.alpha, aes(x = Site, y = X..Organic.Matter , color = Site)) +
+  geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.3) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8)) +
+  theme_classic() +
+  labs(x = "site", y = "tom")
+```
 
 
 
+(2) TN
+```{r}
+#TN
+mod_N <- lmer(X..Nitrogen ~ Sample.Type + Site + (1|Mat),
+               data = iess.alpha)
+#assumptions
+# Plot residuals against fitted values
+plot(residuals(mod_N) ~ fitted(mod_N))
 
+# Shapiro-Wilk normality test
+shapiro.test(residuals(mod_N))
+
+# Q-Q plot of residuals
+qqnorm(residuals(mod_N))
+qqline(residuals(mod_N))
+plot_model(mod_N, type = 'diag')
+
+```
+
+
+```{r}
+library(lmerTest)
+
+mod_N <- lmer(X..Nitrogen ~ Sample.Type + Site + (1|Mat),
+              data = iess.alpha)
+
+summary(mod_N)
+```
+
+(2) TOC
+```{r}
+#TOC
+mod_TOC <- lmer(X..Organic.Carbon ~ Sample.Type + Site + (1|Mat),
+               data = iess.alpha)
+#assumptions
+# Plot residuals against fitted values
+plot(residuals(mod_TOC) ~ fitted(mod_TOC))
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals(mod_TOC))
+
+# Q-Q plot of residuals
+qqnorm(residuals(mod_TOC))
+qqline(residuals(mod_TOC))
+plot_model(mod_TOC, type = 'diag')
+
+```
+```{r}
+mod_TOC <- lmer(X..Organic.Carbon ~ Sample.Type + Site + (1|Mat),
+               data = iess.alpha)
+summary(mod_TOC)
+```
+```{r}
+#not adding to paper
+ggplot(iess.alpha, aes(x = Sample.Type, y = X..Organic.Carbon, color = Site)) +
+  geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.3) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8)) +
+  theme_classic() +
+  labs(x = "sample type", y = "toc")
+```
+
+~nutrient correlations 
+to see families across the entire experiment:
+```{r}
+#note:iessmdffam ~ calculated and saved below ..need to  read back in here
+iessmdffam %>%
+  group_by(Family) %>%
+  summarise(Total_Abundance = sum(Abundance)) %>%
+  arrange(desc(Total_Abundance))
+```
+
+These are the >2% most relative abundant families (percentage) 
+```{r}
+top_families <- iessmdffam %>%
+  group_by(Family) %>%
+  summarise(Abundance = sum(Abundance)) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100) %>%
+  filter(Percentage > 2) %>%
+  arrange(desc(Percentage))
+
+top_families
+```
+
+Calculating correlation coefficients based on Pearson
+```{r}
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#iess.alpha
+#iessmdffam
+
+# Merge dataframes 
+merged.iess <- merge(iess.alpha, iessmdffam, by = "Sample")
+
+#Define top families (this is taxa w > 2% relative abundance) ---
+specific_family <- c("Rhodobacteraceae", "Desulfocapsaceae", "Flavobacteriaceae",
+                     "Saprospiraceae","Woeseiaceae","Pirellulaceae",
+                     "Halieaceae","A4b", "Cyclobacteriaceae", "Desulfosarcinaceae", "Puniceicoccaceae")
+
+# Filter for top families & remove NAs 
+merged_clean <- merged.iess %>%
+  filter(Family %in% specific_family) %>%
+  drop_na(Abundance, X..Organic.Matter.x, X..Organic.Carbon.x, X..Nitrogen.x)
+
+#  Pivot nutrients to long format 
+corr_df_long <- merged_clean %>%
+  pivot_longer(
+    cols = c(X..Organic.Matter.x, X..Organic.Carbon.x, X..Nitrogen.x),
+    names_to = "Variable",
+    values_to = "Nutrient"
+  )
+
+# Calculate correlations + p-values per family × nutrient
+corr_family <- corr_df_long %>%
+  group_by(Family, Variable) %>%
+  summarize(
+    Correlation_Coefficient = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$estimate,
+      NA
+    ),
+    
+    P_value = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$p.value,
+      NA
+    ),
+    
+    .groups = "drop"
+  )
+#write.csv(corr_family, "iess.corr_family.csv")
+
+```
+~sig stars added later~
+corr_fam uploaded to github for easy readability of sig correlations 
+
+
+HEATMAP
+
+```{r}
+iessheatmap_topfamily <- ggplot(corr_family, aes(x = Variable, y = Family, fill = Correlation_Coefficient)) +
+  geom_tile(color = "white") +
+  scale_fill_gradientn(
+    colours = c(
+      "tomato4",
+      "tomato",
+      "palegreen",
+      "palegreen4"
+    ),
+    name = "Pearson's Correlation"
+  ) +
+  scale_y_discrete(position = "right") +
+  labs(x = "Nutrients", y = "Top Families") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    panel.border = element_blank(),
+    legend.position = "right"
+  )
+
+iessheatmap_topfamily
+```
+
+
+
+~sig stars added later~
+corr_fam uploaded to github for easy readability of sig correlations 
+
+
+
+Bar plots!
+
+Need to sum groups (ie + site)
+```{r}
+library(microshades)
+iess.ps.cleaner.rel <- transform_sample_counts(iess.ps.cleaner, function(x) x / sum(x))
+fam.aggreg1 <- tax_glom(iess.ps.cleaner.rel, "Family")
+iessmdffam<- prep_mdf(fam.aggreg1, subgroup_level = "Family")
+```
+```{r}
+write.csv(iessmdffam, "iess.mdffam.csv")
+```
+
+site example below: 
+*repeated for sample.type 
+```{r}
+library(dplyr)
+iessfam_site <- iessmdffam %>%
+  group_by(Site, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+#convert to relative abundance within each transect
+iessfam_site <- iessfam_site %>%
+  group_by(Site) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100)
+
+#grouping rules (same as above) applied
+#families less than 1% relatively abundant grouped in "rare families" category 
+#families only assigned at higher taxonomic rankings (phyla, class, order, ect) grouped into "Assigned at Higher Taxonomy" category
+#note: some families were "unknown" meaning silva database was unable to find a match, so there should also be an "unknown" category unless all samples had identification to the family level
+
+iessfam_site$Family_grouped <- ifelse(
+  grepl("_", iessfam_site$Family),
+  "Assigned at Higher Taxonomy",
+  ifelse(iessfam_site$Percentage < 1, "Rare Families", iessfam_site$Family)
+)
+
+#re-sum after grouping (bc grouped categories are now collapsed)
+iess_site_grouped <- iessfam_site %>%
+  group_by(Site, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#consistent stacking order based on overall abundance!
+family_order <- iess_site_grouped %>%
+  group_by(Family_grouped) %>%
+  summarise(Total = sum(Percentage)) %>%
+  arrange(Total) %>%
+  pull(Family_grouped)
+
+iess_site_grouped$Family_grouped <- factor(
+  iess_site_grouped$Family_grouped,
+  levels = family_order
+)
+```
+
+save & then read in the dataframes (for next time can just read in these!)
+```{r}
+write.csv(iess_sample.type_grouped, "iess_sample.type_grouped.csv")
+write.csv(iess_site_grouped, "iess_site_grouped.csv")
+```
+
+Scaling colors for visual comparisons 
+(all the colors on the same scale) 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(RColorBrewer)
+
+# Clean/standardize names
+iess_sample.type_grouped$Family_grouped <- trimws(as.character(iess_sample.type_grouped$Family_grouped))
+iess_site_grouped$Family_grouped <- trimws(as.character(iess_site_grouped$Family_grouped))
+
+
+#all families 
+all_families <- unique(c(
+  iess_sample.type_grouped$Family_grouped,
+  iess_site_grouped$Family_grouped
+))
+
+# color palette *want contrast*
+my_colors <- colorRampPalette(
+  brewer.pal(12, "Paired")
+)(length(all_families))
+
+my_colors <- setNames(my_colors, all_families)
+
+# color specific categories
+my_colors[names(my_colors) %in% "Assigned at Higher Taxonomy"] <- "darkblue"
+my_colors[names(my_colors) %in% "Rare Families"]              <- "grey80"
+my_colors[names(my_colors) %in% "Unknown Family"]             <- "grey0"
+
+
+# Set factor levels (for consistency)
+iess_sample.type_grouped$Family_grouped <- factor(
+  iess_sample.type_grouped$Family_grouped,
+  levels = names(my_colors)
+)
+
+iess_site_grouped$Family_grouped <- factor(
+  iess_site_grouped$Family_grouped,
+  levels = names(my_colors)
+
+)
+```
+
+Figure 4A ~ site
+```{r}
+#cleaning and ordering Monthc column
+iess_site_grouped$Site <- trimws(iess_site_grouped$Site)
+unique(iess_site_grouped$Site)
+iess_site_grouped$Site <- factor(
+  iess_site_grouped$Site,
+  levels = c( "TM", "SB")
+)
+
+#plotting IESS Site
+
+plot2 <- ggplot(iess_site_grouped,
+       aes(x = Site, y = Percentage, fill = Family_grouped)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Site", y = "Relative Abundance (%)", fill = "Family") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    panel.border = element_blank()
+  ) +
+  scale_fill_manual(values = my_colors)
+
+plot2
+```
+
+Figure 4B ~ sample.type
+```{r}
+#cleaning and ordering Monthc column
+iess_sample.type_grouped$Sample.Type <- trimws(iess_sample.type_grouped$Sample.Type)
+unique(iess_sample.type_grouped$Sample.Type)
+iess_sample.type_grouped$Sample.Type<- factor(
+ iess_sample.type_grouped$Sample.Type,
+  levels = c( "Internal", "External")
+)
+
+#plotting IESS Site
+plot3 <- ggplot(iess_sample.type_grouped,
+       aes(x = Sample.Type, y = Percentage, fill = Family_grouped)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Sample Type", y = "Relative Abundance (%)", fill = "Family") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    panel.border = element_blank()
+  ) +
+  scale_fill_manual(values = my_colors)
+
+plot3
+```
+put side by side? 
+```{r}
+#remove legend frim plot 3 
+
+plot3.noleg <- ggplot(iess_sample.type_grouped,
+       aes(x = Sample.Type, y = Percentage, fill = Family_grouped)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Sample Type", y = "Relative Abundance (%)", fill = "Family") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+    plot.margin = margin(5, 5, 5, 5),
+    panel.grid = element_blank(),
+    panel.border = element_blank()
+  ) +
+  scale_fill_manual(values = my_colors)
+
+plot3.noleg
+```
+
+```{r}
+library(cowplot)
+# Extract legend
+plot2.1 <- get_legend(plot2)
+
+# Remove legend from original plot if desired
+plot2.noleg <- plot2 +
+  theme(legend.position = "none")
+
+```
+
+```{r}
+#fix up side by side bar plot 
+mid <- cowplot::plot_grid(
+  plot2.noleg,
+  plot3.noleg,
+  plot2.1,
+  ncol = 3,
+  rel_widths = c(.8, .4, .4)
+)
+mid
+```
+
+figure 4 c ~ ordination plot
+```{r}
+#finalpcoaplot_internalexternal
+ie.pcoa.1 <- plot_ordination(iess.ps.cleaner.clr,ordinate(iess.ps.cleaner.clr,"PCoA", "euclidean"),color="Sample.Type", shape="Site")+
+  stat_ellipse(linewidth=.5)+
+  geom_point(size = 3, alpha = 0.8)+
+  theme_classic(base_size = 18)+
+  #ggtitle(substitute(paste(italic("Location"))))+
+  scale_color_manual(name = "Sample.Type", values = c("palegreen4","tomato4"))
+ie.pcoa.1
+
+```
+ figure 4d ~ nutrient correlation plot (iessheatmap_topfamily)
+ 
+ 
+```{r}
+#put 4c & 4d side by side
+mid.2 <- cowplot::plot_grid(
+  ie.pcoa.1,
+  iessheatmap_topfamily,
+  ncol = 2,
+  rel_widths = c(1, 1)
+)
+mid.2
+```
+
+Final combo plot!
+
+```{r}
+iess.fin <- cowplot::plot_grid(mid.2,mid, ncol = 1, rel_widths    = c(1,1))
+iess.fin
+```
+```{r}
+ggsave("iess.fin.pdf",
+       plot = iess.fin,
+       width = 15,
+       height = 12,
+       dpi = 300)
+```
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
