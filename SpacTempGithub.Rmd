@@ -803,6 +803,12 @@ corr_fam uploaded to github for easy readability of sig correlations
 HEATMAP
 
 ```{r}
+#make family in alphebetical order
+corr_family$Family <- factor(
+  corr_family$Family,
+  levels = sort(unique(corr_family$Family), decreasing = TRUE)
+)
+
 iessheatmap_topfamily <- ggplot(corr_family, aes(x = Variable, y = Family, fill = Correlation_Coefficient)) +
   geom_tile(color = "white") +
   scale_fill_gradientn(
@@ -1078,7 +1084,7 @@ ggsave("iess.fin.pdf",
        dpi = 300)
 ```
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+start back here 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
