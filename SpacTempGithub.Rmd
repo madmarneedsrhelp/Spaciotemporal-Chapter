@@ -443,6 +443,7 @@ ggsave(
 
 ```
 
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IESS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```{r}
 iess.seqtab <- data.frame(otu_table(iess.ps.cleaner))
@@ -517,6 +518,7 @@ plot_model(iess.alpha.2, type = 'diag')
 
 ```
 passes model assumptions
+
 ```{r}
 iess.alpha.3 <- lmer(Evenness ~ Site + Sample.Type + (1|Mat) , data = iess.alpha, REML = FALSE)
 summary(iess.alpha.3)
@@ -555,7 +557,7 @@ ggplot(iess.alpha, aes(x = Sample.Type, y = InvSimpson, color = Site)) +
   theme_classic() +
   labs(x = "Sample Type", y = "InvSimpson")
 ```
-*internal richness and diversity is higher
+*internal evenness and inv simpson  is higher
 *plots above not included in paper, purely for result visualization
 
 Diff Abund! 
@@ -800,8 +802,7 @@ corr_family <- corr_df_long %>%
 corr_fam uploaded to github for easy readability of sig correlations 
 
 
-HEATMAP
-
+HEATMAP #decided not to add to final paper!
 ```{r}
 #make family in alphebetical order
 corr_family$Family <- factor(
@@ -811,15 +812,16 @@ corr_family$Family <- factor(
 
 iessheatmap_topfamily <- ggplot(corr_family, aes(x = Variable, y = Family, fill = Correlation_Coefficient)) +
   geom_tile(color = "white") +
+  
   scale_fill_gradientn(
-    colours = c(
-      "tomato4",
-      "tomato",
-      "palegreen",
-      "palegreen4"
-    ),
-    name = "Pearson's Correlation"
-  ) +
+  colours = c(
+    "#A6CEE3",  # light blue
+    "#1F78B4",  # dark blue
+    "#B2DF8A",  # light green
+    "#33A02C"   # dark green
+  ),
+  name = "Pearson's Correlation"
+) +
   scale_y_discrete(position = "right") +
   labs(x = "Nutrients", y = "Top Families") +
   theme_minimal() +
@@ -834,16 +836,12 @@ iessheatmap_topfamily <- ggplot(corr_family, aes(x = Variable, y = Family, fill 
 
 iessheatmap_topfamily
 ```
-
-
-
-~sig stars added later~
-corr_fam uploaded to github for easy readability of sig correlations 
+*results arent super interesting (only 1 stat) so scratch above heatmap for final paper
+*corr_fam uploaded to github for easy readability of sig correlations (just in case) 
 
 
 
 Bar plots!
-
 Need to sum groups (ie + site)
 ```{r}
 library(microshades)
@@ -948,7 +946,7 @@ iess_site_grouped$Family_grouped <- factor(
 )
 ```
 
-Figure 4A ~ site
+Figure 4B ~ site
 ```{r}
 #cleaning and ordering Monthc column
 iess_site_grouped$Site <- trimws(iess_site_grouped$Site)
@@ -964,7 +962,7 @@ plot2 <- ggplot(iess_site_grouped,
        aes(x = Site, y = Percentage, fill = Family_grouped)) +
   geom_bar(stat = "identity") +
   labs(x = "Site", y = "Relative Abundance (%)", fill = "Family") +
-  theme_bw() +
+  theme_bw(base_size = 16) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank(),
@@ -973,6 +971,8 @@ plot2 <- ggplot(iess_site_grouped,
   scale_fill_manual(values = my_colors)
 
 plot2
+
+
 ```
 
 Figure 4B ~ sample.type
@@ -1044,7 +1044,7 @@ mid <- cowplot::plot_grid(
 mid
 ```
 
-figure 4 c ~ ordination plot
+figure 4a ~ ordination plot
 ```{r}
 #finalpcoaplot_internalexternal
 ie.pcoa.1 <- plot_ordination(iess.ps.cleaner.clr,ordinate(iess.ps.cleaner.clr,"PCoA", "euclidean"),color="Sample.Type", shape="Site")+
@@ -1056,36 +1056,44 @@ ie.pcoa.1 <- plot_ordination(iess.ps.cleaner.clr,ordinate(iess.ps.cleaner.clr,"P
 ie.pcoa.1
 
 ```
- figure 4d ~ nutrient correlation plot (iessheatmap_topfamily)
+
  
- 
-```{r}
-#put 4c & 4d side by side
-mid.2 <- cowplot::plot_grid(
-  ie.pcoa.1,
-  iessheatmap_topfamily,
-  ncol = 2,
-  rel_widths = c(1, 1)
-)
-mid.2
-```
 
 Final combo plot!
 
 ```{r}
-iess.fin <- cowplot::plot_grid(mid.2,mid, ncol = 1, rel_widths    = c(1,1))
+iess.fin <- cowplot::plot_grid(ie.pcoa.1,mid, ncol = 2, rel_widths    = c(.5,1))
 iess.fin
 ```
 ```{r}
 ggsave("iess.fin.pdf",
        plot = iess.fin,
-       width = 15,
+       width = 29,
        height = 12,
        dpi = 300)
 ```
+
+*no pam for iess (because dependent internal/external samples with no mat id to pair them)
+*no graphs for alpha or nutrients 
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 start back here 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+
+
+
+
+read in *need to upload these to github*
+```{r}
+sm.pam <- read.csv("SM.PAM copy.csv")
+di.pam <- read.csv("DI.PAM copy.csv")
+```
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 
 
