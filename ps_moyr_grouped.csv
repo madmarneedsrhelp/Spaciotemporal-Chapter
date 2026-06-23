@@ -1,0 +1,195 @@
+"","Month_Year","Family_grouped","Percentage"
+"1","April_2024","A4b",4.25882689587428
+"2","April_2024","Alteromonadaceae",1.56068594551671
+"3","April_2024","Balneolaceae",1.43032393744979
+"4","April_2024","Cryomorphaceae",2.98391397873902
+"5","April_2024","Cyclobacteriaceae",6.37718044109922
+"6","April_2024","Desulfocapsaceae",1.59304563123585
+"7","April_2024","Flammeovirgaceae",1.55143296511402
+"8","April_2024","Flavobacteriaceae",11.1938530275101
+"9","April_2024","Halieaceae",2.78997540697641
+"10","April_2024","Phycisphaeraceae",2.22816407713679
+"11","April_2024","Pirellulaceae",3.22138549673936
+"12","April_2024","Puniceicoccaceae",4.69479465302402
+"13","April_2024","Rare Families",23.3936251442122
+"14","April_2024","Rhodobacteraceae",14.0708627568888
+"15","April_2024","Rhodothermaceae",1.1835457526658
+"16","April_2024","Rubritaleaceae",1.64304306135104
+"17","April_2024","Saprospiraceae",7.26781037550335
+"18","April_2024","Sphingomonadaceae",1.95787501429848
+"19","April_2024","Thermoanaerobaculaceae",1.11208784489623
+"20","April_2024","Unknown Family",1.7193611615967
+"21","April_2024","Woeseiaceae",3.76820643217177
+"22","August_2024","A4b",3.2632201997878
+"23","August_2024","Alteromonadaceae",1.02276233478351
+"24","August_2024","Chromatiaceae",1.47277744082241
+"25","August_2024","Cryomorphaceae",1.01216627345068
+"26","August_2024","Cyclobacteriaceae",4.5442671257355
+"27","August_2024","Desulfocapsaceae",3.47696772413915
+"28","August_2024","Desulfosarcinaceae",1.62130696921764
+"29","August_2024","Desulfovibrionaceae",1.47312910489447
+"30","August_2024","Flammeovirgaceae",1.4436579084068
+"31","August_2024","Flavobacteriaceae",9.59462322806515
+"32","August_2024","Halieaceae",4.59569744523285
+"33","August_2024","Phycisphaeraceae",1.52365227306268
+"34","August_2024","Pirellulaceae",3.25385211252279
+"35","August_2024","Puniceicoccaceae",8.39847346671714
+"36","August_2024","Rare Families",30.7848717631361
+"37","August_2024","Rhodobacteraceae",9.5348854824086
+"38","August_2024","Saprospiraceae",5.26169569597704
+"39","August_2024","Sphingomonadaceae",1.65729456304651
+"40","August_2024","Spirochaetaceae",1.05251061224376
+"41","August_2024","Unknown Family",2.21746062066156
+"42","August_2024","Woeseiaceae",2.79472765568787
+"43","December_2023","A4b",6.11855157764521
+"44","December_2023","Balneolaceae",1.30269598662398
+"45","December_2023","Cryomorphaceae",1.65676341373863
+"46","December_2023","Cyclobacteriaceae",5.00256245920057
+"47","December_2023","Desulfocapsaceae",3.6971139368456
+"48","December_2023","Desulfovibrionaceae",1.56957572668015
+"49","December_2023","Flavobacteriaceae",9.21463407389147
+"50","December_2023","Halieaceae",3.55577781650706
+"51","December_2023","Phormidesmiaceae",1.29951685703223
+"52","December_2023","Phycisphaeraceae",2.37515302264354
+"53","December_2023","Pirellulaceae",3.29591377124205
+"54","December_2023","Puniceicoccaceae",4.53222200446347
+"55","December_2023","Rare Families",27.8911011430756
+"56","December_2023","Rhodobacteraceae",11.95763114244
+"57","December_2023","Rubritaleaceae",1.38511685617377
+"58","December_2023","Saprospiraceae",8.0039389714957
+"59","December_2023","Spirochaetaceae",1.41247556040521
+"60","December_2023","Unknown Family",1.7803290346093
+"61","December_2023","Woeseiaceae",3.94892664528642
+"62","February_2024","A4b",5.01491817880498
+"63","February_2024","Alteromonadaceae",1.49878112757886
+"64","February_2024","Coleofasciculaceae",1.03009773031371
+"65","February_2024","Cryomorphaceae",2.29737414245631
+"66","February_2024","Cyclobacteriaceae",4.01203830452338
+"67","February_2024","Desulfocapsaceae",2.28813275354487
+"68","February_2024","Desulfococcaceae",1.43997359474164
+"69","February_2024","Flavobacteriaceae",13.3368904915947
+"70","February_2024","Halieaceae",2.43649253815845
+"71","February_2024","Halomonadaceae",2.10121522660828
+"72","February_2024","Marinobacteraceae",3.02067723220088
+"73","February_2024","Phycisphaeraceae",1.89558879472556
+"74","February_2024","Pirellulaceae",2.30097833348258
+"75","February_2024","Puniceicoccaceae",4.26854908777577
+"76","February_2024","Rare Families",25.8047920594942
+"77","February_2024","Rhodobacteraceae",13.3553297026163
+"78","February_2024","Saprospiraceae",4.96163657923843
+"79","February_2024","Spirochaetaceae",1.46266261255347
+"80","February_2024","Unknown Family",1.11838169041568
+"81","February_2024","Vibrionaceae",4.27007581438263
+"82","February_2024","Woeseiaceae",2.08541400478933
+"83","July_2023","A4b",1.34471726300393
+"84","July_2023","Bacteroidetes BD2-2",1.63045990600708
+"85","July_2023","Chromatiaceae",1.95392617003734
+"86","July_2023","Cyclobacteriaceae",2.84085022920543
+"87","July_2023","Desulfobacteraceae",1.35390297040893
+"88","July_2023","Desulfobulbaceae",1.62817144167974
+"89","July_2023","Desulfocapsaceae",9.15444469619698
+"90","July_2023","Desulfococcaceae",1.05144982166773
+"91","July_2023","Desulfosarcinaceae",1.78755905383709
+"92","July_2023","Desulfovibrionaceae",1.61240361735958
+"93","July_2023","Flavobacteriaceae",14.751768926747
+"94","July_2023","Halieaceae",3.81756592104863
+"95","July_2023","Pirellulaceae",4.06184686726976
+"96","July_2023","Prolixibacteraceae",1.32562754249164
+"97","July_2023","Puniceicoccaceae",1.74132111177413
+"98","July_2023","Rare Families",29.5914865212533
+"99","July_2023","Rhodobacteraceae",7.77124582050702
+"100","July_2023","Saprospiraceae",4.70448162024524
+"101","July_2023","Spirochaetaceae",1.35901350295637
+"102","July_2023","Unknown Family",2.77466571733765
+"103","July_2023","Woeseiaceae",3.74309127896537
+"104","July_2025","A4b",8.87488936533021
+"105","July_2025","Balneolaceae",1.33904157587656
+"106","July_2025","Beggiatoaceae",1.40833073721655
+"107","July_2025","Cryomorphaceae",1.68676393885166
+"108","July_2025","Cyclobacteriaceae",4.64474267071663
+"109","July_2025","Flammeovirgaceae",1.58762502374312
+"110","July_2025","Flavobacteriaceae",4.54829142798066
+"111","July_2025","Halieaceae",2.02926893956121
+"112","July_2025","Hyphomonadaceae",1.17415369506373
+"113","July_2025","Micavibrionaceae",1.09768312842068
+"114","July_2025","Nodosilineaceae",3.43199834562476
+"115","July_2025","Phormidesmiaceae",3.44357422176699
+"116","July_2025","Phycisphaeraceae",1.66230906589815
+"117","July_2025","Pirellulaceae",3.42851021809401
+"118","July_2025","Puniceicoccaceae",2.75309609168829
+"119","July_2025","Rare Families",19.322166434819
+"120","July_2025","Rhodobacteraceae",12.73432900794
+"121","July_2025","Rhodothermaceae",3.04085811827312
+"122","July_2025","Saprospiraceae",9.73249452909415
+"123","July_2025","Sphingomonadaceae",3.77343877540907
+"124","July_2025","Trueperaceae",1.78934938495434
+"125","July_2025","Unknown Family",3.21547778332722
+"126","July_2025","Woeseiaceae",3.28160752034991
+"127","June_2023","A4b",6.73447009605903
+"128","June_2023","Acanthopleuribacteraceae",2.04926498556734
+"129","June_2023","Cryomorphaceae",1.3931841961199
+"130","June_2023","Cyclobacteriaceae",4.09598643907342
+"131","June_2023","Desulfocapsaceae",2.97367761674426
+"132","June_2023","Flavobacteriaceae",8.3358300172814
+"133","June_2023","Halieaceae",2.41092174099791
+"134","June_2023","Phormidiaceae",1.39723568785659
+"135","June_2023","Phycisphaeraceae",2.42987739738495
+"136","June_2023","Pirellulaceae",5.35620066257541
+"137","June_2023","Puniceicoccaceae",3.03669216114874
+"138","June_2023","Rare Families",27.8291298075499
+"139","June_2023","Rhodobacteraceae",11.348464562246
+"140","June_2023","Rhodothermaceae",1.24052434262415
+"141","June_2023","Rubritaleaceae",1.40073674501426
+"142","June_2023","Sandaracinaceae",1.18003245504836
+"143","June_2023","Saprospiraceae",5.49317286106372
+"144","June_2023","Sphingomonadaceae",1.11919210731107
+"145","June_2023","Thermoanaerobaculaceae",1.71728919336999
+"146","June_2023","Unknown Family",2.08409821619093
+"147","June_2023","Vibrionaceae",1.3894381271485
+"148","June_2023","Woeseiaceae",4.98458058162423
+"149","June_2024","A4b",8.06636131233372
+"150","June_2024","Bacteroidetes BD2-2",1.93812545383751
+"151","June_2024","Balneolaceae",2.85847542054298
+"152","June_2024","Beggiatoaceae",1.01074127896962
+"153","June_2024","Coleofasciculaceae",1.06049249016563
+"154","June_2024","Cryomorphaceae",1.62764948393605
+"155","June_2024","Cyclobacteriaceae",3.52207429585287
+"156","June_2024","Desulfocapsaceae",4.56224816729916
+"157","June_2024","Desulfosarcinaceae",1.08375961688226
+"158","June_2024","Desulfovibrionaceae",1.62479176928477
+"159","June_2024","Flavobacteriaceae",7.45990750537522
+"160","June_2024","Halieaceae",3.12546316626043
+"161","June_2024","Phormidesmiaceae",1.61160564038312
+"162","June_2024","Phormidiaceae",1.0459017148606
+"163","June_2024","Phycisphaeraceae",2.08010575960515
+"164","June_2024","Pirellulaceae",2.45713969189251
+"165","June_2024","Puniceicoccaceae",2.7347133017111
+"166","June_2024","Rare Families",28.5608403833594
+"167","June_2024","Rhodobacteraceae",8.96001882004564
+"168","June_2024","Saprospiraceae",5.23128953150284
+"169","June_2024","Sphingomonadaceae",1.31319982545624
+"170","June_2024","Spirochaetaceae",2.26197429367039
+"171","June_2024","Trueperaceae",1.07103708252662
+"172","June_2024","Unknown Family",2.34444863521756
+"173","June_2024","Woeseiaceae",2.38763535902861
+"174","October_2023","A4b",4.30818931395686
+"175","October_2023","Alteromonadaceae",1.8329326567966
+"176","October_2023","BD2-7",1.04027047335289
+"177","October_2023","Cyclobacteriaceae",3.97401700175475
+"178","October_2023","Desertifilaceae",2.7110991375643
+"179","October_2023","Desulfobulbaceae",1.34789623228281
+"180","October_2023","Desulfocapsaceae",4.5778504250792
+"181","October_2023","Desulfosarcinaceae",1.42538045901601
+"182","October_2023","Flammeovirgaceae",1.67337778610797
+"183","October_2023","Flavobacteriaceae",15.0472829673419
+"184","October_2023","Halieaceae",4.6484457990892
+"185","October_2023","Phycisphaeraceae",1.58999182453985
+"186","October_2023","Pirellulaceae",2.7033232436737
+"187","October_2023","Puniceicoccaceae",2.7708769433744
+"188","October_2023","Rare Families",24.5827637510989
+"189","October_2023","Rhodobacteraceae",10.6346147661505
+"190","October_2023","Saprospiraceae",6.31441849077755
+"191","October_2023","Sphingomonadaceae",1.28274960505604
+"192","October_2023","Spirochaetaceae",1.34191618996153
+"193","October_2023","Unknown Family",2.19214747860737
+"194","October_2023","Woeseiaceae",4.00045545441774
