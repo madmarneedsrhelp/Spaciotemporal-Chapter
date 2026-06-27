@@ -1077,23 +1077,1349 @@ ggsave("iess.fin.pdf",
 *no graphs for alpha or nutrients 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-start back here 
 
+*fix month order - make it chronological in time!!!!!!!
 
-
-
-
-
-
-read in *need to upload these to github*
 ```{r}
-sm.pam <- read.csv("SM.PAM copy.csv")
-di.pam <- read.csv("DI.PAM copy.csv")
+ps.seqtab <- data.frame(otu_table(ps.ps.cleaner))
+ps.dist.all <- vegdist(ps.seqtab, method = "euclidean")
 ```
+
+extract metadata
+```{r}
+ps.samdf <- data.frame(sample_data(ps.ps.cleaner))
+```
+
+update sample dataframe
+
+```{r}
+ps.samdf <- ps.samdf %>%
+  mutate(
+    Month_Year = paste(Month, Year, sep = "_"),
+    Season = case_when(
+      Month %in% c("March", "April", "May") ~ "Spring",
+      Month %in% c("June", "July", "August") ~ "Summer",
+      Month %in% c("September", "October", "November") ~ "Fall",
+      Month %in% c("December", "January", "February") ~ "Winter",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+Beta Dispersion!
+```{r}
+ps.bet.all1 <- betadisper(ps.dist.all,ps.samdf$Month_Year)
+anova(ps.bet.all1) 
+tukey1 <- TukeyHSD(ps.bet.all1)
+tukey1
+
+ps.bet.all2 <- betadisper(ps.dist.all,ps.samdf$Season)
+anova(ps.bet.all2) 
+tukey2 <- TukeyHSD(ps.bet.all2)
+tukey2
+
+ps.bet.all3 <- betadisper(ps.dist.all,ps.samdf$Site)
+anova(ps.bet.all3) 
+
+```
+Not significant p=.1002, .9643
+
+Beta Diversity
+```{r}
+ps.samdf$Month_Year <- as.factor(ps.samdf$Month_Year)
+ps.samdf$Season <- as.factor(ps.samdf$Season)
+ps.samdf$Site <- as.factor(ps.samdf$Site)
+adonis2(ps.dist.all ~ Month_Year * Site , data=ps.samdf, permutations=9999) #this one is more informative
+adonis2(ps.dist.all ~ Season * Site , data=ps.samdf, permutations=9999)
+```
+~ focusing on month_year * site interaction 
+~ site-stratified permanova
+
+```{r}
+sites <- unique(ps.samdf$Site)
+
+for (s in sites) {
+
+  cat("\n--- PERMANOVA: Month_Year differences within Site =", s, "---\n")
+
+  site_idx <- ps.samdf$Site == s
+
+  dist_subset <- as.dist(as.matrix(ps.dist.all)[site_idx, site_idx])
+  meta_subset <- ps.samdf[site_idx, ]
+
+  if (length(unique(meta_subset$Month_Year)) > 1) {
+    result <- adonis2(dist_subset ~ Month_Year,
+                      data = meta_subset,
+                      permutations = 9999)
+    print(result)
+  } else {
+    cat("Not enough Month_Year levels for this site.\n")
+  }
+}
+```
+
+*yes, month_years differ at each site...but which ones? maybe flop for more specifics
+
+does sites differ within each month_year? 
+```{r}
+months <- unique(ps.samdf$Month_Year)
+
+for (m in months) {
+
+  cat("\n--- PERMANOVA: Site differences within Month_Year =", m, "---\n")
+
+  meta_subset <- subset(ps.samdf, Month_Year == m)
+
+  # subset distance matrix using matching rownames
+  dist_subset <- as.dist(
+    as.matrix(ps.dist.all)[rownames(ps.samdf) %in% rownames(meta_subset),
+                           rownames(ps.samdf) %in% rownames(meta_subset)]
+  )
+
+  meta_subset <- meta_subset[match(attr(dist_subset, "Labels"), rownames(meta_subset)), ]
+
+  if (length(unique(meta_subset$Site)) > 1) {
+
+    result <- adonis2(dist_subset ~ Site,
+                      data = meta_subset,
+                      permutations = 9999)
+
+    print(result)
+
+  } else {
+    cat("Not enough Site levels for this Month_Year.\n")
+  }
+}
+```
+~~~~~~~~~~~~~~~~~~~~~Put plots in chronological order and cowplot them!!
+Community Comp Plots: 
+```{r}
+sd <- sample_data(ps.ps.cleaner.clr)
+
+sd$Month_Year <- factor(
+  paste(sd$Month, sd$Year, sep = "_"),
+  levels = c(
+    "June_2023", "July_2023","October_2023", "December_2023", "February_2024", "April_2024","June_2024", "August_2024", "July_2025" )
+)
+
+sd$Site <- as.factor(sd$Site)
+
+sample_data(ps.ps.cleaner.clr) <- sd
+```
+
+```{r}
+unique(sample_data(ps.ps.cleaner.clr)$Month_Year)
+```
+
+```{r}
+sm.pcaochsht.1 <- plot_ordination(
+  ps.ps.cleaner.clr,
+  ordinate(ps.ps.cleaner.clr, "PCoA", "euclidean"),
+  shape = "Site",
+  color = "Month_Year"
+) +
+  geom_point(size = 6, alpha = 0.8) +
+  scale_color_viridis_d(name = "Month_Year") +
+  theme_classic(base_size = 22)
+
+sm.pcaochsht.1
+```
+
+```{r}
+sm.pcaochsht.1 <- plot_ordination(
+  ps.ps.cleaner.clr,
+  ordinate(ps.ps.cleaner.clr, "PCoA", "euclidean"),
+  shape = "Site",
+  color = "Month_Year"
+) +
+  geom_point(size = 6, alpha = 0.8) +
+  stat_ellipse(aes(group = Site), type = "t", linewidth = .2) +
+  scale_color_viridis_d(name = "Month_Year") +
+  theme_classic(base_size = 22) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text  = element_text(size = 12)
+  )
+
+
+sm.pcaochsht.1 <- sm.pcaochsht.1 +
+  theme(
+    axis.title = element_text(size = 12),
+    axis.text  = element_text(size = 10),
+
+    legend.title = element_text(size = 10),
+    legend.text  = element_text(size = 10),
+    legend.key.size = unit(0.4, "cm")
+  )
+
+sm.pcaochsht.1
+```
+
+Interaction Plots
+Month_Year*Site interaction ~ to better visualize this
+```{r}
+ord.df1 <- read.csv("sm.ordination_df copy.csv")
+ord.df2 <- read.csv("sm.ordination_df2 copy.csv")
+```
+
+```{r}
+month_levels <- c(     "June_2023", "July_2023","October_2023", "December_2023", "February_2024", "April_2024","June_2024", "August_2024", "July_2025" )
+ps.int.1 <- ggplot(
+  ord.df1,
+  aes(
+    x = factor(Site),
+    y = PCoA1,
+    color = factor(Month_Year, levels = month_levels),
+    group = Month_Year
+  )
+) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_viridis_d(name = "Month_Year") +
+  labs(
+    title = "Interaction plot",
+    x = "Site",
+    y = "PCoA Axis 1 score"
+  ) +
+  theme_minimal()
+
+ps.int.1
+```
+
+```{r}
+ps.int.2 <- ggplot(
+  ord.df1,
+  aes(
+    x = factor(Month_Year, levels = month_levels),
+    y = PCoA1,
+    color = Site,
+    group = Site
+  )
+) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_viridis_d(name = "Site") +
+  labs(
+    title = "Interaction plot",
+    x = "Month_Year",
+    y = "PCoA Axis 1 score"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    axis.title.x = element_text(size = 10),
+    axis.ticks.x = element_line(linewidth = 0.5),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+ps.int.2
+```
+*good ~ for final plot, top is pcoa, these 2 in the middle, bar plot (below) on bottom 
+
+
+Bar plots! **START BACK UP HERE TOMORROW 
+
+Need to sum groups (month_year)
+```{r}
+library(microshades)
+ps.ps.cleaner.rel <- transform_sample_counts(ps.ps.cleaner, function(x) x / sum(x))
+fam.aggreg1 <- tax_glom(ps.ps.cleaner.rel, "Family")
+psmdffam<- prep_mdf(fam.aggreg1, subgroup_level = "Family")
+```
+
+
+```{r}
+
+psmdffam <- psmdffam %>%
+  mutate(
+    Month_Year = paste(Month, Year, sep = "_"),
+    Season = case_when(
+      Month %in% c("March", "April", "May") ~ "Spring",
+      Month %in% c("June", "July", "August") ~ "Summer",
+      Month %in% c("September", "October", "November") ~ "Fall",
+      Month %in% c("December", "January", "February") ~ "Winter",
+      TRUE ~ NA_character_
+    )
+  )
+write.csv(psmdffam, "ps.mdffam.csv") #upload to github
+```
+
+
+
+month_year example below: 
+*repeated for season & site
+```{r}
+library(dplyr)
+pssfam_moyr <- psmdffam %>%
+  group_by(Month_Year, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+#convert to relative abundance within each transect
+pssfam_moyr <- pssfam_moyr %>%
+  group_by(Month_Year) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100)
+
+#grouping rules (same as above) applied
+#families less than 1% relatively abundant grouped in "rare families" category 
+#families only assigned at higher taxonomic rankings (phyla, class, order, ect) grouped into "Assigned at Higher Taxonomy" category
+#note: some families were "unknown" meaning silva database was unable to find a match, so there should also be an "unknown" category unless all samples had identification to the family level
+
+pssfam_moyr$Family_grouped <- ifelse(
+  grepl("_", pssfam_moyr$Family),
+  "Assigned at Higher Taxonomy",
+  ifelse(pssfam_moyr$Percentage < 1, "Rare Families", pssfam_moyr$Family)
+)
+
+#re-sum after grouping (bc grouped categories are now collapsed)
+ps_moyr_grouped <- pssfam_moyr %>%
+  group_by(Month_Year, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#consistent stacking order based on overall abundance!
+family_order <-  ps_moyr_grouped%>%
+  group_by(Family_grouped) %>%
+  summarise(Total = sum(Percentage)) %>%
+  arrange(Total) %>%
+  pull(Family_grouped)
+
+ps_moyr_grouped$Family_grouped <- factor(
+  ps_moyr_grouped$Family_grouped,
+  levels = family_order
+)
+```
+
+```{r}
+library(dplyr)
+pssfam_seas <- psmdffam %>%
+  group_by(Season, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+#convert to relative abundance within each transect
+pssfam_seas <- pssfam_seas %>%
+  group_by(Season) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100)
+
+#grouping rules (same as above) applied
+#families less than 1% relatively abundant grouped in "rare families" category 
+#families only assigned at higher taxonomic rankings (phyla, class, order, ect) grouped into "Assigned at Higher Taxonomy" category
+#note: some families were "unknown" meaning silva database was unable to find a match, so there should also be an "unknown" category unless all samples had identification to the family level
+
+pssfam_seas$Family_grouped <- ifelse(
+  grepl("_", pssfam_seas$Family),
+  "Assigned at Higher Taxonomy",
+  ifelse(pssfam_seas$Percentage < 1, "Rare Families", pssfam_seas$Family)
+)
+
+#re-sum after grouping (bc grouped categories are now collapsed)
+ps_seas_grouped <- pssfam_seas %>%
+  group_by(Season, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#consistent stacking order based on overall abundance!
+family_order <- ps_seas_grouped %>%
+  group_by(Family_grouped) %>%
+  summarise(Total = sum(Percentage)) %>%
+  arrange(Total) %>%
+  pull(Family_grouped)
+
+ps_seas_grouped$Family_grouped <- factor(
+  ps_seas_grouped$Family_grouped,
+  levels = family_order
+)
+```
+
+```{r}
+library(dplyr)
+pssfam_site <- psmdffam %>%
+  group_by(Site, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+#convert to relative abundance within each transect
+pssfam_site <- pssfam_site %>%
+  group_by(Site) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100)
+
+#grouping rules (same as above) applied
+#families less than 1% relatively abundant grouped in "rare families" category 
+#families only assigned at higher taxonomic rankings (phyla, class, order, ect) grouped into "Assigned at Higher Taxonomy" category
+#note: some families were "unknown" meaning silva database was unable to find a match, so there should also be an "unknown" category unless all samples had identification to the family level
+
+pssfam_site$Family_grouped <- ifelse(
+  grepl("_", pssfam_site$Family),
+  "Assigned at Higher Taxonomy",
+  ifelse(pssfam_site$Percentage < 1, "Rare Families", pssfam_site$Family)
+)
+
+#re-sum after grouping (bc grouped categories are now collapsed)
+ps_site_grouped <- pssfam_site %>%
+  group_by(Site, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#consistent stacking order based on overall abundance!
+family_order <- ps_site_grouped %>%
+  group_by(Family_grouped) %>%
+  summarise(Total = sum(Percentage)) %>%
+  arrange(Total) %>%
+  pull(Family_grouped)
+
+ps_site_grouped$Family_grouped <- factor(
+  ps_site_grouped$Family_grouped,
+  levels = family_order
+)
+```
+
+save & then read in the dataframes (for next time can just read in these!)
+```{r}
+write.csv(ps_moyr_grouped, "ps_moyr_grouped.csv")
+write.csv(ps_seas_grouped, "ps_seas_grouped.csv")
+write.csv(ps_site_grouped, "ps_site_grouped.csv")
+```
+
+
+Scaling colors for visual comparisons 
+(all the colors on the same scale) 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(viridisLite)
+
+# Clean/standardize names
+ps_moyr_grouped$Family_grouped <- trimws(as.character(ps_moyr_grouped$Family_grouped))
+ps_seas_grouped$Family_grouped <- trimws(as.character(ps_seas_grouped$Family_grouped))
+ps_site_grouped$Family_grouped <- trimws(as.character(ps_site_grouped$Family_grouped))
+
+
+# Get all unique families across datasets
+all_families <- sort(unique(c(
+  ps_moyr_grouped$Family_grouped,
+  ps_seas_grouped$Family_grouped,
+  ps_site_grouped$Family_grouped
+)))
+
+# Create viridis color palette
+my_colors <- setNames(
+  viridisLite::viridis(
+    n = length(all_families),
+    option = "D"
+  ),
+  all_families
+
+)
+
+
+# Override colors for special categories
+my_colors["Assigned at Higher Taxonomy"] <- "darkblue"
+my_colors["Rare Families"] <- "grey80"
+my_colors["Unknown Family"] <- "black"
+
+ps_moyr_grouped$Family_grouped <- factor(
+  ps_moyr_grouped$Family_grouped,
+  levels = all_families
+)
+
+ps_seas_grouped$Family_grouped <- factor(
+  ps_seas_grouped$Family_grouped,
+  levels = all_families
+)
+
+ps_site_grouped$Family_grouped <- factor(
+  ps_site_grouped$Family_grouped,
+  levels = all_families
+)
+
+```
+
+
+```{r}
+ps_moyr_grouped$Month_Year <- factor(
+  ps_moyr_grouped$Month_Year,
+  levels = month_levels
+)
+
+ps.plot1 <- ggplot(
+  ps_moyr_grouped,
+  aes(x = Month_Year, y = Percentage, fill = Family_grouped)
+) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "Sampling Period (Month & Year)",
+    y = "Relative Abundance (%)",
+    fill = "Family"
+  ) +
+  scale_fill_manual(values = my_colors) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    panel.border = element_blank()
+  )
+
+
+ps.plot1 <- ps.plot1 +
+  theme(
+    legend.position = "left",
+    legend.text = element_text(size = 8),
+    legend.title = element_text(size = 10),
+    legend.key.size = unit(0.5, "cm"),
+    legend.spacing.y = unit(0.05, "cm")
+  )
+
+ps.plot1 <- ps.plot1 +
+  guides(fill = guide_legend(ncol = 2))
+
+ps.plot1
+```
+
+```{r}
+#not going to use this one
+seas_levels <- c(
+  "Summer",
+  "Fall",
+  "Winter",
+  "Spring"
+)
+
+ps_seas_grouped$Season <- factor(
+  ps_seas_grouped$Season,
+  levels = seas_levels
+)
+
+ps.plot2 <- ggplot(
+  ps_seas_grouped,
+  aes(x = Season, y = Percentage, fill = Family_grouped)
+) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "Season",
+    y = "Relative Abundance (%)",
+    fill = "Family"
+  ) +
+  scale_fill_manual(values = my_colors) +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line(colour = "black")
+  )
+ps.plot2
+```
+
+```{r}
+#removed legend
+site_levels <- c(
+  "SB",
+  "TM"
+)
+
+ps_site_grouped$Site <- factor(
+  ps_site_grouped$Site,
+  levels = site_levels
+)
+
+ps.plot3 <- ggplot(
+  ps_site_grouped,
+  aes(x = Site, y = Percentage, fill = Family_grouped)
+) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "Site",
+    y = "Relative Abundance (%)",
+    fill = "Family"
+  ) +
+  scale_fill_manual(values = my_colors) +
+  theme_bw() +
+  theme(
+  panel.grid = element_blank(),
+  panel.border = element_blank(),
+  axis.line = element_line(colour = "black"),
+  legend.position = "none"
+)
+ps.plot3
+```
+
+
+Combo composition plot ~ will do later
+sm.pcaochsht.1
+ps.int.1
+ps.int.2
+ps.plot1
+ps.plot3
+
+```{r}
+library(cowplot)
+
+ps.mid <- cowplot::plot_grid(
+  ps.int.1,
+  ps.int.2,
+  ncol = 2,
+  align = "h"
+  #labels = c("A", "B")   # optional panel labels
+)
+ps.mid
+```
+
+```{r}
+ps.bottom <- cowplot::plot_grid(
+  ps.plot1,
+  ps.plot3,
+  ncol = 2,
+  align = "h",
+  rel_widths = c(1, .45))  # optional panel labels
+
+ps.bottom
+```
+
+```{r}
+ps.comp.plot <- cowplot::plot_grid(
+  sm.pcaochsht.1,
+  ps.mid,
+  ps.bottom,
+  ncol = 1,
+  align = "h",
+  rel_heights  = c(.5,1,1))  # optional panel labels
+
+ps.comp.plot
+```
+```{r}
+ggsave("ps_comp_plot.pdf", plot = ps.comp.plot, width = 13, height = 21, dpi = 300)
+```
+
+
+Diff Abund! 
+(1) Month_Year
+*repeat for:
+(2) Season *change group variable in code below and rerun
+(3) Site *change group variable in code below and rerun
+
+```{r}
+ps.diff.abund1 <- ancombc2(
+  data = ps.ps.cleaner,      # your phyloseq object
+  tax_level = "Family",      # or "Genus", etc.
+  fix_formula = "Month_Year",  # variable to test
+  p_adj_method = "holm",
+  group = "Month_Year",        # group variable for pairwise tests
+  struc_zero = TRUE,         # detects true absences
+  neg_lb = TRUE,
+  em_control = list(
+    tol = 1e-5,
+    max_iter = 100,
+    sensitivity = TRUE
+  ),
+  alpha = 0.05,
+  global = TRUE
+)
+```
+```{r}
+#structural zero results (need to clean up in excel)
+View(ps.diff.abund1$zero_ind)
+#write.csv(ps.diff.abund1$zero_ind, "ps.diff.abund1_strzeros.csv", row.names = TRUE)
+#sensitivity results (scores are low, this is why we negate global and pairwise results and focus on the robust structural zero results above)
+View(ps.diff.abund1$pseudo_sens_tab)
+#write.csv(ps.diff.abund1$pseudo_sens_tab, "ps.diff.abund1_sens.csv", row.names = TRUE)
+```
+
+Alpha Diversity
+
+alpha diversity dataframe set up: 
+how did we make these? 
+alpha_diversity<- data.frame(estimate_richness(ps.cleaner, split=TRUE, measures=c("Shannon","InvSimpson","Observed")))
+alpha_diversity$Evenness <- alpha_diversity$Shannon / log(alpha_diversity$Observed)
+
+^did this for each experiment and saved dataframes to be uploaded below 
+ps.cleaner phyloseq object should not have transformed data (should use raw or minimally processed data for this)
+
+*if included below then the model passes assumptions + significant results 
+
+```{r}
+ps.ps.alpha<- read.csv("alpha.div.sm copy.csv") #this one is uploaded to github 
+```
+
+setting factors
+```{r}
+ps.ps.alpha <- ps.ps.alpha %>%
+  mutate(
+    Month_Year = factor(Month_Year, levels = month_levels),
+    Site = factor(Site)
+  )
+```
+
+Shannon
+```{r}
+library(vegan)
+ps.alpha.1 <-aov(Shannon ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.alpha.1)
+```
+
+```{r}
+#Assumption checks
+#1. Normality
+qqnorm(residuals(ps.alpha.1))
+qqline(residuals(ps.alpha.1), col = "red")
+shapiro_test <- shapiro.test(residuals(ps.alpha.1))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Shannon ~ Site * Month_Year, data = ps.ps.alpha)
+print(levene_test)
+#3 linearity
+plot(ps.alpha.1, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(ps.alpha.1)
+```
+
+*did not pass assumptions, so do KW
+
+we have to do independent nonparametric kruskal wallis tests...... cannot look at the interaction between site and month! 
+```{r}
+kruskal.test(Shannon ~ Month_Year, data = ps.ps.alpha)  # main effect of month
+kruskal.test(Shannon ~ Site, data = ps.ps.alpha)        # main effect of site
+```
+Yes to month_year!
+
+checking for spreads or extreme skews...
+```{r}
+boxplot(Shannon ~ Month_Year, data = ps.ps.alpha)
+boxplot(Shannon ~ Site, data = ps.ps.alpha)
+#Shannon diversity distributions differ among months (rank-based differences)
+```
+looks fine to me! ~ let's do post hoc test for month_year
+```{r}
+library(FSA)
+dunn_results_ps1 <- dunnTest(Shannon ~ Month_Year,
+                         data = ps.ps.alpha,
+                         method = "bh")   # adjust p-values
+dunn_results_ps1
+```
+specific months differ ~ what does this look like? 
+April_2024 - August_2024	-2.96507744	0.0030260675	0.03631281	
+August_2024 - February_2024	3.43702748	0.0005881359	0.01058645	
+August_2024 - October_2023	3.48832640	0.0004860543	0.01749796	
+(aug diversity is higher)
+
+
+```{r}
+# month plot for shannon diversity
+ps.ps.alpha$Month_Year <- factor(
+  ps.ps.alpha$Month_Year,
+  levels = month_levels
+)
+
+library(ggpubr)
+library(ggplot2)
+library(viridisLite)
+
+# more vibrant viridis palette for months
+month_colors <- setNames(
+  viridis(
+    n = length(month_levels),
+    option = "turbo"   # <- much more vivid than "D"
+  ),
+  month_levels
+)
+
+ps.shannon <- ggplot(
+  ps.ps.alpha,
+  aes(
+    x = factor(Month_Year, levels = month_levels),
+    y = Shannon,
+    fill = factor(Month_Year, levels = month_levels)
+  )
+) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = month_colors) +
+  coord_cartesian(ylim = c(4.5, 7.5)) +
+  ylab("Shannon Diversity") +
+  xlab("Sampling Period") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 15),
+    legend.position = "none"
+  ) +
+  stat_compare_means(
+    comparisons = list(c("1", "5"), c("3", "5")),
+    method = "t.test",
+    label = "p.signif",
+    label.y = c(7.3, 7.5)
+  )
+
+ps.shannon
+```
+
+Inv Simpson
+```{r}
+library(vegan)
+ps.alpha.2 <-aov(InvSimpson ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.alpha.2)
+
+#Assumption checks
+#1. Normality
+qqnorm(residuals(ps.alpha.2))
+qqline(residuals(ps.alpha.2), col = "red")
+shapiro_test <- shapiro.test(residuals(ps.alpha.2))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(InvSimpson ~ Site * Month_Year, data = ps.ps.alpha)
+print(levene_test)
+#3 linearity
+plot(ps.alpha.2, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(ps.alpha.2)
+#The Durbin-Watson statistic ranges from 0 to 4.
+#2 = no autocorrelation
+#< 2 = positive autocorrelation
+#> 2 = negative autocorrelation
+```
+passes assumptions:
+
+post hoc (month_year)
+```{r}
+TukeyHSD(ps.alpha.2, which = "Site")
+TukeyHSD(ps.alpha.2, which = "Month_Year")
+```
+Inv Simpson: both site and month_year differ ~ but month_year does not have ind. months that differ
+look at effect size:
+```{r}
+library(effectsize)
+eta_squared(ps.alpha.2)
+```
+*both effect sizes are non-trivial
+*will report site and month_year stat sig results for inv simpson
+
+
+Richness
+```{r}
+library(vegan)
+ps.alpha.3 <-aov(Observed ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.alpha.3)
+
+#Assumption checks
+#1. Normality
+qqnorm(residuals(ps.alpha.3))
+qqline(residuals(ps.alpha.3), col = "red")
+shapiro_test <- shapiro.test(residuals(ps.alpha.3))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Observed ~ Site * Month_Year, data = ps.ps.alpha)
+print(levene_test)
+#3 linearity
+plot(ps.alpha.3, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(ps.alpha.3)
+#The Durbin-Watson statistic ranges from 0 to 4.
+#2 = no autocorrelation
+#< 2 = positive autocorrelation
+#> 2 = negative autocorrelation
+```
+```{r}
+TukeyHSD(ps.alpha.3, which = "Month_Year")
+```
+august is driving differences!!!!
+also differences between months in july 
+August_2024-June_2023        1150.238681   470.04850 1830.428866 0.0000349
+August_2024-June_2024        1179.700000   624.32704 1735.072961 0.0000002
+August_2024-July_2023        1454.238681   774.04850 2134.428866 0.0000001
+August_2024-July_2025         727.538681    86.24922 1368.828137 0.0150343
+October_2023-July_2025       -715.461319 -1356.75078  -74.171863 0.0179395
+February_2024-July_2025      -735.661319 -1376.95078  -94.371863 0.0133311
+April_2024-July_2025         -645.061319 -1286.35078   -3.771863 0.0475876
+October_2023-August_2024    -1443.000000 -1998.37296 -887.627039 0.0000000 (p < 0.01)
+December_2023-August_2024   -1301.915409 -1872.50688 -731.323933 0.0000000 (p < 0.01)
+February_2024-August_2024   -1463.200000 -2018.57296 -907.827039 0.0000000 (p < 0.01)
+April_2024-August_2024      -1372.600000 -1927.97296 -817.227039 0.0000000 (p < 0.01)
+
+```{r}
+library(ggpubr)
+library(ggplot2)
+
+ps.rich <- ggplot(
+  ps.ps.alpha,
+  aes(
+    x = factor(Month_Year, levels = month_levels),
+    y = Observed,
+    fill = factor(Month_Year, levels = month_levels)
+  )
+) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = month_colors) +
+  coord_cartesian(ylim = c(50, 3500)) +
+  ylab("Richness") +
+  xlab("Sampling Period") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.position = "none"
+  ) +
+  stat_compare_means(
+    comparisons = list(c("1", "5"), c("3", "5")), 
+    method = "t.test", 
+    label = "p.signif", 
+    label.y = c(7.3, 7.5)  # adjust y positions as needed
+  )
+
+ps.rich
+
+# Save the plot
+# ggsave("shannon.summer.alpha.png", plot = shannon.sum, width = 6, height = 5, dpi = 300)
+
+```
+
+
+Evenness
+```{r}
+library(vegan)
+ps.alpha.4 <-aov(Evenness ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.alpha.4)
+
+#Assumption checks
+#1. Normality
+qqnorm(residuals(ps.alpha.4))
+qqline(residuals(ps.alpha.4), col = "red")
+shapiro_test <- shapiro.test(residuals(ps.alpha.4))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Evenness ~ Site * Month_Year, data = ps.ps.alpha)
+print(levene_test)
+#3 linearity
+plot(ps.alpha.4, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(ps.alpha.4)
+#The Durbin-Watson statistic ranges from 0 to 4.
+#2 = no autocorrelation
+#< 2 = positive autocorrelation
+#> 2 = negative autocorrelation
+```
+*did not pass assumptions, so do KW
+
+we have to do independent nonparametric kruskal wallis tests...... cannot look at the interaction between site and month! 
+```{r}
+kruskal.test(Evenness ~ Month_Year, data = ps.ps.alpha)  # main effect of month
+kruskal.test(Evenness ~ Site, data = ps.ps.alpha)        # main effect of site
+```
+Yes to month_year!
+
+checking for spreads or extreme skews...
+```{r}
+boxplot(Evenness ~ Month_Year, data = ps.ps.alpha)
+boxplot(Evenness ~ Site, data = ps.ps.alpha)
+#Shannon diversity distributions differ among months (rank-based differences)
+```
+
+looks fine to me! ~ let's do post hoc test for month_year
+```{r}
+library(FSA)
+dunn_results_ps4 <- dunnTest(Evenness ~ Month_Year,
+                         data = ps.ps.alpha,
+                         method = "bh")   # adjust p-values
+dunn_results_ps4
+```
+August_2024 - December_2023	-3.0668545	0.0021632410	0.015575335
+August_2024 - July_2023	-2.8817149	0.0039551744	0.020340897	
+August_2024 - June_2023	-3.5016187	0.0004624410	0.008323937	
+April_2024 - July_2025	2.9113947	0.0035981913	0.021589148	
+December_2023 - July_2025	3.4194114	0.0006275677	0.007530812
+July_2023 - July_2025	3.2557357	0.0011309898	0.010178908
+July_2025 - June_2023	-3.8164598	0.0001353801	0.004873685
+July_2025 - October_2023	-2.5915263	0.0095551227	0.042998052	
+
+
+```{r}
+#month plot for even
+ps.even <- ggplot(
+  ps.ps.alpha,
+  aes(
+    x = factor(Month_Year, levels = month_levels),
+    y = Evenness,
+    fill = factor(Month_Year, levels = month_levels)
+  )
+) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "black") +
+  scale_fill_manual(values = month_colors) +
+  coord_cartesian(ylim = c(0.72, 1)) +
+  ylab("Evenness") +
+  xlab("Sampling Period") +
+  theme_classic(base_size = 14) +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    legend.position = "none"
+  ) +
+  stat_compare_means(
+    comparisons = list(c("1", "5"), c("3", "5")), 
+    method = "t.test", 
+    label = "p.signif", 
+    label.y = c(7.3, 7.5)  # adjust y positions as needed
+  )
+
+ps.even
+
+# Save the plot
+# ggsave("shannon.summer.alpha.png", plot = shannon.sum, width = 6, height = 5, dpi = 300)
+
+```
+combo alpha plot:
+```{r}
+ps.alpha <- cowplot::plot_grid(
+  ps.shannon,
+  ps.rich,
+  ps.even,
+  ncol = 3,
+  align = "h",
+  rel_widths = c(1,1,1))  # optional panel labels
+
+ps.alpha
+```
+```{r}
+ggsave("ps_alpha_plot.pdf", plot = ps.alpha, width = 15, height = 8, dpi = 300)
+```
+
+how many samples in each month?
+```{r}
+table(ps.ps.alpha$Month_Year)
+```
+
+
+Nutrients 
+TOM - stat results (sampling period & site) ~log transformed anova
+TOC - No stat results
+TN -  site result ~kruskal wallis test (nonparametric)
+```{r}
+ps.nuts.1 <- aov(TOM ~ Month_Year * Site, data = ps.ps.alpha)
+summary(ps.nuts.1)
+#assumption check
+# 1. Normality
+qqnorm(residuals(ps.nuts.1))
+qqline(residuals(ps.nuts.1), col = "red")
+shapiro.test(residuals(ps.nuts.1))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOM ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.1, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.1, which = 1)
+```
+```{r}
+ps.ps.alpha$TOM_log <- log1p(ps.ps.alpha$TOM)
+ps.nuts.1log <- aov(TOM_log ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.nuts.1log)
+
+# 1. Normality
+qqnorm(residuals(ps.nuts.1log))
+qqline(residuals(ps.nuts.1log), col = "red")
+shapiro.test(residuals(ps.nuts.1log))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOM_log ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.1log, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.1log, which = 1)
+```
+post hoc (month_year)
+```{r}
+TukeyHSD(ps.nuts.1log, which = "Site")
+TukeyHSD(ps.nuts.1log, which = "Month_Year")
+```
+July_2023-June_2023          0.456737854  0.07950964  0.83396607 0.0078466
+October_2023-July_2023      -0.411557988 -0.73824720 -0.08486877 0.0049045
+December_2023-July_2023     -0.386175978 -0.71885999 -0.05349196 0.0124968
+April_2024-July_2023        -0.415737761 -0.74242698 -0.08904854 0.0043294
+
+July 2023 > June, October, Dec 2023 & April 2024
+
+```{r}
+#not using
+ps.nuts.2 <- aov(TOC ~ Month_Year * Site, data = ps.ps.alpha)
+summary(ps.nuts.2)
+#assumption check
+# 1. Normality
+qqnorm(residuals(ps.nuts.2))
+qqline(residuals(ps.nuts.2), col = "red")
+shapiro.test(residuals(ps.nuts.2))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOC ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.2, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.2, which = 1)
+```
+```{r}
+#not using
+ps.ps.alpha$TOC_log <- log1p(ps.ps.alpha$TOC)
+ps.nuts.2log <- aov(TOC_log ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.nuts.2log)
+
+# 1. Normality
+qqnorm(residuals(ps.nuts.2log))
+qqline(residuals(ps.nuts.2log), col = "red")
+shapiro.test(residuals(ps.nuts.2log))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOC_log ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.2log, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.2log, which = 1)
+```
+
+```{r}
+#NONPARAMETRIC
+kruskal.test(TOC ~ Month_Year, data = ps.ps.alpha)  # main effect of month
+kruskal.test(TOC ~ Site, data = ps.ps.alpha)        # main effect of site
+```
+NONE 
+checking for spreads or extreme skews...
+```{r}
+boxplot(TOC ~ Month_Year, data = ps.ps.alpha)
+boxplot(TOC ~ Site, data = ps.ps.alpha)
+```
+looks fine to me! 
+
+```{r}
+ps.nuts.3 <- aov(TN ~ Month_Year * Site, data = ps.ps.alpha)
+summary(ps.nuts.3)
+#assumption check
+# 1. Normality
+qqnorm(residuals(ps.nuts.3))
+qqline(residuals(ps.nuts.3), col = "red")
+shapiro.test(residuals(ps.nuts.3))
+
+# 2. Homogeneity of variance
+car::leveneTest(TN ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.3, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.3, which = 1)
+```
+```{r}
+#not using
+ps.ps.alpha$TN_log <- log1p(ps.ps.alpha$TN)
+ps.nuts.3log <- aov(TN_log ~ Site * Month_Year, data = ps.ps.alpha)
+summary(ps.nuts.3log)
+
+# 1. Normality
+qqnorm(residuals(ps.nuts.3log))
+qqline(residuals(ps.nuts.3log), col = "red")
+shapiro.test(residuals(ps.nuts.3log))
+
+# 2. Homogeneity of variance
+car::leveneTest(TN_log ~ Site * Month_Year, data = ps.ps.alpha)
+plot(ps.nuts.3log, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.nuts.3log, which = 1)
+```
+
+```{r}
+#NONPARAMETRIC
+kruskal.test(TN ~ Month_Year, data = ps.ps.alpha)  # main effect of month
+kruskal.test(TN ~ Site, data = ps.ps.alpha)        # main effect of site
+```
+NONE 
+checking for spreads or extreme skews...
+```{r}
+boxplot(TN ~ Month_Year, data = ps.ps.alpha)
+boxplot(TN ~ Site, data = ps.ps.alpha)
+```
+
+
+Nutrient correlations & heatmap
+
+~nutrient correlations 
+to see families across the entire experiment:
+```{r}
+#note:iessmdffam ~ calculated and saved below ..need to  read back in here
+psmdffam %>%
+  group_by(Family) %>%
+  summarise(Total_Abundance = sum(Abundance)) %>%
+  arrange(desc(Total_Abundance))
+```
+These are the >2% most relative abundant families (percentage) 
+```{r}
+pstop_families <- psmdffam %>%
+  group_by(Family) %>%
+  summarise(Abundance = sum(Abundance)) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100) %>%
+  filter(Percentage > 2) %>%
+  arrange(desc(Percentage))
+
+pstop_families
+```
+Calculating correlation coefficients based on Pearson
+```{r}
+ps.ps.alpha$Sample <- ps.ps.alpha$Sample.ID
+```
+
+```{r}
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#ps.ps.alpha
+#psmdffam
+
+# Merge dataframes 
+merged.ps <- merge(ps.ps.alpha, psmdffam, by = "Sample")
+
+#Define top families (this is taxa w > 2% relative abundance) ---
+specific_family_ps <- c("Rhodobacteraceae", "Flavobacteriaceae",
+                     "Saprospiraceae","A4b","Cyclobacteriaceae",
+                     "Puniceicoccaceae","Desulfocapsaceae", "Halieaceae", "Woeseiaceae", "Pirellulaceae")
+
+# Filter for top families & remove NAs 
+merged_clean_ps <- merged.ps %>%
+  filter(Family %in% specific_family_ps) %>%
+  drop_na(Abundance, TOM.x, TOC.x, TN.x)
+
+#  Pivot nutrients to long format 
+corr_df_long_ps <- merged_clean_ps %>%
+  pivot_longer(
+    cols = c(TOM.x, TOC.x, TN.x),
+    names_to = "Variable",
+    values_to = "Nutrient"
+  )
+
+# Calculate correlations + p-values per family × nutrient
+corr_family_ps <- corr_df_long_ps %>%
+  group_by(Family, Variable) %>%
+  summarize(
+    Correlation_Coefficient = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$estimate,
+      NA
+    ),
+    
+    P_value = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$p.value,
+      NA
+    ),
+    
+    .groups = "drop"
+  )
+#write.csv(corr_family_ps, "ps.corr_family.csv")
+
+```
+~sig stars added later~
+corr_fam_ps uploaded to github for easy readability of sig correlations 
+
+
+HEATMAP #decided not to add to final paper!
+```{r}
+corr_family_ps$Family <- factor(
+  corr_family_ps$Family,
+  levels = rev(sort(unique(corr_family_ps$Family)))
+)
+psheatmap_topfamily <- ggplot(corr_family_ps, aes(x = Variable, y = Family, fill = Correlation_Coefficient)) +
+  geom_tile(color = "white") +
+  
+  scale_fill_gradientn(
+  colors = c(
+    "#440154",
+    "#9E5DB8",
+    "#35B779",
+    "#187244"
+  ),
+
+  name = "Pearson's Correlation"
+) +
+  scale_y_discrete(position = "right") +
+  labs(x = "Nutrients", y = "Bacterial Families") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    panel.border = element_blank(),
+    legend.position = "right"
+  )
+
+psheatmap_topfamily
+```
+
+
+PAM
+
+```{r}
+pam <- read.csv("SM.PAM copy.csv")
+```
+
+```{r}
+#deleting diel pam for this part 
+ps.pam <- pam[-(89:123), ]
+```
+
+
+```{r}
+ps.pam1 <- aov(Y.II. ~ Month._Year * Site, data = ps.pam)
+summary(ps.pam1)
+#assumption check
+# 1. Normality
+qqnorm(residuals(ps.pam1))
+qqline(residuals(ps.pam1), col = "red")
+shapiro.test(residuals(ps.pam1))
+
+# 2. Homogeneity of variance
+car::leveneTest(Y.II. ~ Site * Month._Year, data = ps.pam)
+plot(ps.pam1, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(ps.pam1, which = 1)
+```
+significant interaction between month_year*site
+
+estimated marginal means to untangle interaction!
+```{r}
+library(emmeans)
+#Does PSII yield differ among months within each site?
+emm_month <- emmeans(ps.pam1, ~ Month._Year | Site)
+pairs(emm_month, adjust = "tukey")
+```
+SB:
+Aug_24 - Feb_24    -0.44542 0.0784 91  -5.685  <.0001
+Feb_24 - July_23    0.38103 0.0679 91   5.615  <.0001
+Feb_24 - June_24    0.33660 0.0784 91   4.296  0.0008
+Feb_24 - Oct_23     0.34462 0.0898 91   3.839  0.0041
+
+TM:
+Dec_23 - July_23    0.27359 0.0798 91   3.426  0.0199
+
+```{r}
+#Does PSII yield differ among sites within each month?
+emm_site <- emmeans(ps.pam1, ~ Site | Month._Year)
+pairs(emm_site, adjust = "tukey")
+```
+Month._Year = Aug_24:
+ contrast estimate     SE df t.ratio p.value
+ SB - TM   -0.2008 0.0876 91  -2.292  0.0242
+ 
+Month._Year = Feb_24:
+ contrast estimate     SE df t.ratio p.value
+ SB - TM    0.2085 0.0898 91   2.323  0.0224
+
+**start back here!
+pam plot:
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-
+```{r}
+di.pam <- read.csv("DI.PAM copy.csv")
+```
 
