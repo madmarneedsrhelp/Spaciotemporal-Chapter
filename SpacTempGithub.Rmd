@@ -446,13 +446,15 @@ ggsave(
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IESS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```{r}
-iess.seqtab <- data.frame(otu_table(iess.ps.cleaner))
+iess.seqtab <- data.frame(otu_table(iess.ps.cleaner.clr))
 iess.dist.all <- vegdist(iess.seqtab, method = "euclidean")
 ```
 
 extract metadata
+
 ```{r}
-iess.samdf <- data.frame(sample_data(iess.ps.cleaner))
+iess.samdf <- data.frame(sample_data(iess.ps.cleaner.clr))
+View(iess.samdf)
 ```
 
 Beta Dispersion!
@@ -463,7 +465,8 @@ anova(iess.bet.all1)
 iess.bet.all2 <- betadisper(iess.dist.all,iess.samdf$Site)
 anova(iess.bet.all2) 
 ```
-Not significant p=.1002, .9643
+Not significant p=0.7408, 0.07222
+
 
 Beta Diversity
 ```{r}
@@ -1081,7 +1084,7 @@ ggsave("iess.fin.pdf",
 *fix month order - make it chronological in time!!!!!!!
 
 ```{r}
-ps.seqtab <- data.frame(otu_table(ps.ps.cleaner))
+ps.seqtab <- data.frame(otu_table(ps.ps.cleaner.clr))
 ps.dist.all <- vegdist(ps.seqtab, method = "euclidean")
 ```
 
@@ -1112,17 +1115,23 @@ ps.bet.all1 <- betadisper(ps.dist.all,ps.samdf$Month_Year)
 anova(ps.bet.all1) 
 tukey1 <- TukeyHSD(ps.bet.all1)
 tukey1
+```
 
+
+```{r}
 ps.bet.all2 <- betadisper(ps.dist.all,ps.samdf$Season)
 anova(ps.bet.all2) 
 tukey2 <- TukeyHSD(ps.bet.all2)
 tukey2
+```
 
+
+```{r}
 ps.bet.all3 <- betadisper(ps.dist.all,ps.samdf$Site)
 anova(ps.bet.all3) 
 
 ```
-Not significant p=.1002, .9643
+
 
 Beta Diversity
 ```{r}
@@ -1191,7 +1200,7 @@ for (m in months) {
   }
 }
 ```
-~~~~~~~~~~~~~~~~~~~~~Put plots in chronological order and cowplot them!!
+Put plots in chronological order and cowplot them!!
 Community Comp Plots: 
 ```{r}
 sd <- sample_data(ps.ps.cleaner.clr)
@@ -1262,6 +1271,23 @@ ord.df1 <- read.csv("sm.ordination_df copy.csv")
 ord.df2 <- read.csv("sm.ordination_df2 copy.csv")
 ```
 
+how to make ordination dataframe? see below (no need to run for this)
+making an interaction plot 
+Interaction plot! 
+
+ordination2 <- cmdscale(as.dist(sm.dist.all), k = 2, eig = TRUE)
+
+ordination_df2 <- data.frame(
+  SampleID = rownames(ordination2$points),
+  PCoA1 = ordination2$points[, 1],
+  PCoA2 = ordination2$points[, 2]
+)
+
+ordination_df2 <- merge(ordination_df2, sm.samdf.new[, c("Site", "Season")], 
+                       by.x = "SampleID", by.y = "row.names")
+
+
+
 ```{r}
 month_levels <- c(     "June_2023", "July_2023","October_2023", "December_2023", "February_2024", "April_2024","June_2024", "August_2024", "July_2025" )
 ps.int.1 <- ggplot(
@@ -1317,7 +1343,7 @@ ps.int.2
 *good ~ for final plot, top is pcoa, these 2 in the middle, bar plot (below) on bottom 
 
 
-Bar plots! **START BACK UP HERE TOMORROW 
+Bar plots! 
 
 Need to sum groups (month_year)
 ```{r}
@@ -2329,25 +2355,31 @@ psheatmap_topfamily <- ggplot(corr_family_ps, aes(x = Variable, y = Family, fill
   
   scale_fill_gradientn(
   colors = c(
-    "#440154",
-    "#9E5DB8",
-    "#35B779",
-    "#187244"
+     "#9E5DB8",
+     "#DDBDE8",
+     "#AEE8C4", 
+    "#35B779"
+    
   ),
 
   name = "Pearson's Correlation"
 ) +
   scale_y_discrete(position = "right") +
-  labs(x = "Nutrients", y = "Bacterial Families") +
+  labs(x = "% Nutrients", y = "Bacterial Families (>2%)") +
   theme_minimal() +
-  theme(
-    axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    panel.border = element_blank(),
-    legend.position = "right"
-  )
+    theme(
+  axis.text.x = element_text(size = 8),
+  axis.text.y = element_text(size = 8),
+  axis.title.x = element_text(size = 10),
+  axis.title.y = element_text(size = 10),
+  panel.border = element_blank(),
+
+  # Legend text
+  legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7),
+
+  legend.position = "right"
+)
 
 psheatmap_topfamily
 ```
@@ -2361,9 +2393,15 @@ pam <- read.csv("SM.PAM copy.csv")
 
 ```{r}
 #deleting diel pam for this part 
-ps.pam <- pam[-(89:123), ]
+ps.pam <- pam %>%
+  filter(Experiment == "SM")
+#for some reason it deleted April_24 name so readding it 
+ps.pam$Month._Year[is.na(ps.pam$Month._Year)] <- "April_24"
 ```
 
+```{r}
+unique(ps.pam$Month._Year)
+```
 
 ```{r}
 ps.pam1 <- aov(Y.II. ~ Month._Year * Site, data = ps.pam)
@@ -2410,16 +2448,693 @@ Month._Year = Aug_24:
  
 Month._Year = Feb_24:
  contrast estimate     SE df t.ratio p.value
- SB - TM    0.2085 0.0898 91   2.323  0.0224
+ SB - TM    0.2085 0.0898 91   2.323 S
 
 **start back here!
 pam plot:
 
+Graphing PAM
+```{r}
+#fixing april issue
+month_order <- c(
+  "June_23", "July_23", "Oct_23", "Dec_23",
+  "Feb_24", "April_24", "June_24", "July_24",
+  "Aug_24", "July_25"
+)
+
+ps.pam$Month._Year <- as.character(ps.pam$Month._Year)
+
+ps.pam$Month._Year[!ps.pam$Month._Year %in% month_order] <- "April_24"
+
+ps.pam$Month._Year <- factor(ps.pam$Month._Year, levels = month_order)
+
+ps.pam$Month._Year <- as.character(ps.pam$Month._Year)
+
+ps.pam$Month._Year[
+  is.na(ps.pam$Month._Year) |
+  !ps.pam$Month._Year %in% month_order
+] <- "April_24"
+
+ps.pam$Month._Year <- factor(ps.pam$Month._Year, levels = month_order)
+```
+
+```{r}
+month_order
+```
+
+```{r}
+# Plot
+pspamplot <- ggplot(ps.pam, aes(x = Month._Year, y = Y.II.)) +
+  
+  # Boxplots
+  geom_boxplot(
+    outlier.shape = NA,
+    fill = "grey90",
+    color = "black"
+  ) +
+  
+  # Raw points overlaid, colored by Site
+  geom_jitter(
+    aes(color = Site),
+    width = 0.15,
+    size = 2,
+    alpha = 0.8
+  ) +
+  
+  # Site colors
+  scale_color_manual(
+    values = c(
+      "SB" = "#9E5DB8",  # darker reddish-pink
+      "TM" = "#35B779"   # darker blue-green
+    )
+  ) +
+      
+  # Labels
+  labs(
+    x = "Sampling Period (Month_Year)",
+    y = "Y(II)",
+    color = "Site"
+  ) +
+  
+  # Theme
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+```
+```{r}
+pspamplot
+```
+combo nutrient/pam plot
+
+pspamplot
+psheatmap_topfamily
+
+```{r}
+library(cowplot)
+ps.nuts.pam <-cowplot::plot_grid(
+   psheatmap_topfamily,
+   pspamplot,
+  nrow = 1,
+  align = "h",
+  rel_widths = c(.5,1))
+
+ps.nuts.pam
+```
+```{r}
+ggsave("ps_nutspam_plot.pdf", plot = ps.nuts.pam, width = 12, height = 8, dpi = 300)
+```
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DS Stats!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+di.ps.cleaner
+di.ps.cleaner.clr 
+*both already uploaded 
+set up 
+```{r}
+di.seqtab <- data.frame(otu_table(di.ps.cleaner.clr))
+di.dist.all <- vegdist(di.seqtab, method = "euclidean")
+```
+
+extract metadata
+```{r}
+di.samdf <- data.frame(sample_data(di.ps.cleaner))
+```
+
+Beta Dispersion
+```{r}
+di.bet.all1 <- betadisper(di.dist.all,di.samdf$Diel_Time)
+anova(di.bet.all1) 
+```
+Beta Diversity
+```{r}
+di.samdf$Diel_Time <- as.factor(di.samdf$Diel_Time)
+adonis2(di.dist.all ~ Diel_Time, data=di.samdf, permutations=9999)
+```
+Bar plot? (might not even add tbd - lets see how she looks)
 
 
+Bar plots!
+Need to sum group (diel time)
+```{r}
+library(microshades)
+di.ps.cleaner.rel <- transform_sample_counts(di.ps.cleaner, function(x) x / sum(x))
+fam.aggreg3 <- tax_glom(di.ps.cleaner.rel, "Family")
+dimdffam<- prep_mdf(fam.aggreg3, subgroup_level = "Family")
+```
+
+```{r}
+write.csv(dimdffam, "di.mdffam.csv")
+```
+next time just read in dimdffam and go from here
+
+
+```{r}
+library(dplyr)
+difam_time <- dimdffam %>%
+  group_by(Diel_Time, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+#convert to relative abundance within each transect
+difam_time <- difam_time %>%
+  group_by(Diel_Time) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100)
+
+#grouping rules (same as above) applied
+#families less than 1% relatively abundant grouped in "rare families" category 
+#families only assigned at higher taxonomic rankings (phyla, class, order, ect) grouped into "Assigned at Higher Taxonomy" category
+#note: some families were "unknown" meaning silva database was unable to find a match, so there should also be an "unknown" category unless all samples had identification to the family level
+
+difam_time$Family_grouped <- ifelse(
+  grepl("_", difam_time$Family),
+  "Assigned at Higher Taxonomy",
+  ifelse(difam_time$Percentage < 1, "Rare Families", difam_time$Family)
+)
+
+#re-sum after grouping (bc grouped categories are now collapsed)
+di_time_grouped <- difam_time %>%
+  group_by(Diel_Time, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#consistent stacking order based on overall abundance!
+family_order <- di_time_grouped %>%
+  group_by(Family_grouped) %>%
+  summarise(Total = sum(Percentage)) %>%
+  arrange(Total) %>%
+  pull(Family_grouped)
+
+di_time_grouped$Family_grouped <- factor(
+  di_time_grouped$Family_grouped,
+  levels = family_order
+)
+```
+
+save & then read in the dataframes (for next time can just read in these!) uploaded to github!
+```{r}
+write.csv(di_time_grouped, "di_time_grouped.csv")
+```
+
+bar plot making ~ not sure if i will include since no stat diff. 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+
+#Aggregate
+di_time_grouped <- dimdffam %>%
+  group_by(Diel_Time, Family) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop") %>%
+  
+  group_by(Diel_Time) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100) %>%
+  ungroup()
+
+#Group rare + taxonomy levels
+di_time_grouped$Family_grouped <- ifelse(
+  is.na(di_time_grouped$Family) | di_time_grouped$Family == "",
+  "Unknown Family",
+  ifelse(
+    grepl("_", di_time_grouped$Family),
+    "Assigned at Higher Taxonomy",
+    di_time_grouped$Family
+  )
+)
+di_time_grouped$Family_grouped <- ifelse(
+  di_time_grouped$Percentage < 1,
+  "Rare Families",
+  di_time_grouped$Family_grouped
+)
+
+#Re-sum after grouping
+di_time_grouped <- di_time_grouped %>%
+  group_by(Diel_Time, Family_grouped) %>%
+  summarise(Percentage = sum(Percentage), .groups = "drop")
+
+#Clean Diel_Time
+di_time_grouped$Diel_Time <- factor(
+  trimws(di_time_grouped$Diel_Time),
+  levels = c("0","1","2","3","4","5","6")
+)
+#color palette
+all_families <- sort(unique(di_time_grouped$Family_grouped))
+my_colors <- setNames(
+  colorRampPalette(brewer.pal(12, "Set3"))(length(all_families)),
+  all_families
+)
+
+# override  categories
+my_colors["Assigned at Higher Taxonomy"] <- "darkblue"
+my_colors["Rare Families"] <- "grey80"
+my_colors["Unknown Family"] <- "grey30"
+
+#Lock factor levels to palette
+
+di_time_grouped$Family_grouped <- factor(
+  di_time_grouped$Family_grouped,
+  levels = names(my_colors)
+)
+
+#Plot
+plotdi <- ggplot(di_time_grouped,
+                 aes(x = Diel_Time, y = Percentage, fill = Family_grouped)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Diel Time",
+       y = "Relative Abundance (%)",
+       fill = "Family") +
+  theme_bw(base_size = 16) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 6)
+  ) +
+  scale_fill_manual(values = my_colors)
+
+plotdi
+```
+
+
+Diff Abundance
+(1) diel time
+```{r}
+di.diff.abund <- ancombc2(
+  data = di.ps.cleaner,      # your phyloseq object
+  tax_level = "Family",      # or "Genus", etc.
+  fix_formula = "Diel_Time",  # variable to test
+  p_adj_method = "holm",
+  group = "Diel_Time",        # group variable for pairwise tests
+  struc_zero = TRUE,         # detects true absences
+  neg_lb = TRUE,
+  em_control = list(
+    tol = 1e-5,
+    max_iter = 100,
+    sensitivity = TRUE
+  ),
+  alpha = 0.05,
+  global = TRUE
+)
+```
+```{r}
+#structural zero results (need to clean up in excel)
+View(di.diff.abund$zero_ind)
+#write.csv(di.diff.abund$zero_ind, "di.diff.abund_strzeros.csv", row.names = TRUE)
+#sensitivity results (scores are low, this is why we negate global and pairwise results and focus on the robust structural zero results above)
+View(di.diff.abund$pseudo_sens_tab)
+#write.csv(di.diff.abund$pseudo_sens_tab, "di.diff.abund_sens.csv", row.names = TRUE)
+```
+
+Alpha Diversity
+calculated the same as shown above
+```{r}
+di.alpha <- read.csv("alpha.div.di copy.csv") #uploaded to github
+```
+
+Shannon
+```{r}
+di.alpha$Diel_Time <- as.factor(di.alpha$Diel_Time)
+library(vegan)
+di.alpha.1 <-aov(Shannon ~ Diel_Time, data = di.alpha)
+summary(di.alpha.1)
+#Assumption checks
+#1. Normality
+qqnorm(residuals(di.alpha.1))
+qqline(residuals(di.alpha.1), col = "red")
+shapiro_test <- shapiro.test(residuals(di.alpha.1))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Shannon ~ Diel_Time, data = di.alpha)
+print(levene_test)
+#3 linearity
+plot(di.alpha.1, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(di.alpha.1)
+```
+*did not pass assumptions, so do KW
+
+ independent nonparametric kruskal wallis tests.
+```{r}
+kruskal.test(Shannon ~ Diel_Time, data = di.alpha)
+```
+not sig
+
+checking for spreads or extreme skews...
+```{r}
+boxplot(Shannon ~ Diel_Time, data = di.alpha)
+#Shannon diversity distributions differ among months (rank-based differences)
+```
+looks fine!
+
+
+InvSimpson
+```{r}
+di.alpha.2 <-aov(InvSimpson ~ Diel_Time, data = di.alpha)
+summary(di.alpha.1)
+#Assumption checks
+#1. Normality
+qqnorm(residuals(di.alpha.2))
+qqline(residuals(di.alpha.2), col = "red")
+shapiro_test <- shapiro.test(residuals(di.alpha.2))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(InvSimpson ~ Diel_Time, data = di.alpha)
+print(levene_test)
+#3 linearity
+plot(di.alpha.2, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(di.alpha.2)
+```
+passes assumptions, not significant
+
+
+Richness
+```{r}
+di.alpha.3 <-aov(Observed ~ Diel_Time, data = di.alpha)
+summary(di.alpha.3)
+#Assumption checks
+#1. Normality
+qqnorm(residuals(di.alpha.3))
+qqline(residuals(di.alpha.3), col = "red")
+shapiro_test <- shapiro.test(residuals(di.alpha.3))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Observed ~ Diel_Time, data = di.alpha)
+print(levene_test)
+#3 linearity
+plot(di.alpha.3, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(di.alpha.3)
+```
+passes assumptions, not significant
+
+
+Evenness
+```{r}
+di.alpha.4 <-aov(Evenness ~ Diel_Time, data = di.alpha)
+summary(di.alpha.4)
+#Assumption checks
+#1. Normality
+qqnorm(residuals(di.alpha.4))
+qqline(residuals(di.alpha.4), col = "red")
+shapiro_test <- shapiro.test(residuals(di.alpha.4))
+print(shapiro_test)
+#2. Homogeneity
+library(car)
+levene_test <- leveneTest(Evenness ~ Diel_Time, data = di.alpha)
+print(levene_test)
+#3 linearity
+plot(di.alpha.4, which = 1)
+plot
+#4 independence (think about sample design)
+durbinWatsonTest(di.alpha.4)
+```
+*did not pass assumptions, so do KW
+
+ independent nonparametric kruskal wallis tests.
+```{r}
+kruskal.test(Evenness ~ Diel_Time, data = di.alpha)
+```
+not sig
+
+checking for spreads or extreme skews...
+```{r}
+boxplot(Evenness ~ Diel_Time, data = di.alpha)
+#alpha diversity distributions differ among months (rank-based differences)
+```
+looks fine! 
+
+
+Nutrients
+nutrient correlations:
+~nutrient correlations 
+to see families across the entire experiment:
+```{r}
+#note:dsmdffam ~ calculated and saved  ..need to  read back in here
+dimdffam %>%
+  group_by(Family) %>%
+  summarise(Total_Abundance = sum(Abundance)) %>%
+  arrange(desc(Total_Abundance))
+```
+These are the >2% most relative abundant families (percentage) 
+```{r}
+ditop_families <- dimdffam %>%
+  group_by(Family) %>%
+  summarise(Abundance = sum(Abundance)) %>%
+  mutate(Percentage = (Abundance / sum(Abundance)) * 100) %>%
+  filter(Percentage > 2) %>%
+  arrange(desc(Percentage))
+
+ditop_families
+```
+Calculating correlation coefficients based on Pearson
+```{r}
+di.alpha$Sample <- di.alpha$Sample.ID
+```
+
+```{r}
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#di.alpha
+#dimdffam
+
+# Merge dataframes 
+merged.di <- merge(di.alpha, dimdffam, by = "Sample")
+
+#Define top families (this is taxa w > 2% relative abundance) ---
+specific_family_di <- c("Rhodobacteraceae", "Saprospiraceae",
+                     "A4b","Flavobacteriaceae","Halieaceae",
+                     "Pirellulaceae","Cyclobacteriaceae", "Balneolaceae", "Puniceicoccaceae", "Desulfocapsaceae", "Chromatiaceae", "Phycisphaeraceae")
+
+# Filter for top families & remove NAs 
+merged_clean_di <- merged.di %>%
+  filter(Family %in% specific_family_di) %>%
+  drop_na(Abundance, TOM.x)
+
+#  Pivot nutrients to long format 
+corr_df_long_di <- merged_clean_di %>%
+  pivot_longer(
+    cols = c(TOM.x),
+    names_to = "Variable",
+    values_to = "Nutrient"
+  )
+
+# Calculate correlations + p-values per family × nutrient
+corr_family_di <- corr_df_long_di %>%
+  group_by(Family, Variable) %>%
+  summarize(
+    Correlation_Coefficient = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$estimate,
+      NA
+    ),
+    
+    P_value = ifelse(
+      length(unique(Nutrient)) > 1,
+      cor.test(Abundance, Nutrient, method = "pearson")$p.value,
+      NA
+    ),
+    
+    .groups = "drop"
+  )
+#write.csv(corr_family_di, "di.corr_family.csv")
+#not making heatmap because no stat sig correlations with TOM
+```
+corr_fam_di uploaded to github ~ although no sig correlations
+
+Nutrient Models (just TOM)
+```{r}
+di.nuts.1 <- aov(TOM ~ Diel_Time, data = di.alpha)
+summary(di.nuts.1)
+#assumption check
+# 1. Normality
+qqnorm(residuals(di.nuts.1))
+qqline(residuals(di.nuts.1), col = "red")
+shapiro.test(residuals(di.nuts.1))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOM ~ Diel_Time, data = di.alpha)
+plot(di.nuts.1, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(di.nuts.1, which = 1)
+```
+*non-normally disturbuted, try log 
+
+```{r}
+di.alpha$TOM_log <- log1p(di.alpha$TOM)
+di.nuts.1log <- aov(TOM_log ~ Diel_Time, data = di.alpha)
+summary(di.nuts.1log)
+
+# 1. Normality
+qqnorm(residuals(di.nuts.1log))
+qqline(residuals(di.nuts.1log), col = "red")
+shapiro.test(residuals(di.nuts.1log))
+
+# 2. Homogeneity of variance
+car::leveneTest(TOM_log ~ Diel_Time, data = di.alpha)
+plot(di.nuts.1log, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(di.nuts.1log, which = 1)
+```
+still not sig ~ kw & dunns
+
+independent nonparametric kruskal wallis tests.
+```{r}
+kruskal.test(TOM ~ Diel_Time, data = di.alpha)
+```
+sig! p-value = 0.001154
+
+checking for spreads or extreme skews...
+```{r}
+boxplot(TOM ~ Diel_Time, data = di.alpha)
+#alpha diversity distributions differ among months (rank-based differences)
+```
+looks fine! 
+
+
+```{r}
+library(FSA)
+dunn_results_di1 <- dunnTest(TOM ~ Diel_Time,
+                         data = di.alpha,
+                         method = "bh")   # adjust p-values
+dunn_results_di1
+```
+0 - 2	    -2.93176365	0.003370431	0.01769477	
+0 - 3	    -3.02434566	0.002491716	0.01744201
+0 - 5	    -2.46885360	0.013554666	0.04066400
+
+2 - 6	    3.17864901	0.001479631	0.01553613
+3 - 6	    3.27123102	0.001070804	0.02248688
+4 - 6	    2.49971427	0.012429351	0.04350273	
+5 - 6	    2.71573896	0.006612804	0.02777377	
+
+
+PAM
 ```{r}
 di.pam <- read.csv("DI.PAM copy.csv")
 ```
 
+
+```{r}
+di.pam1 <- aov(Y.II. ~ Diel_Time, data = di.pam)
+summary(di.pam1)
+#assumption check
+# 1. Normality
+qqnorm(residuals(di.pam1))
+qqline(residuals(di.pam1), col = "red")
+shapiro.test(residuals(di.pam1))
+
+# 2. Homogeneity of variance
+car::leveneTest(Y.II. ~ Diel_Time, data = di.pam)
+plot(di.pam1, which = 3)
+
+# 3. Residual diagnostics (model fit / variance patterns)
+plot(di.pam1, which = 1)
+```
+passes assumption, no results
+
+tom plot
+```{r}
+diel_colors <- setNames(
+  unname(my_colors[1:length(levels(di.alpha$Diel_Time))]),
+  levels(di.alpha$Diel_Time)
+)
+
+tomplot <- ggplot(di.alpha, aes(x = Diel_Time, y = TOM, fill = Diel_Time)) +
+  geom_boxplot(width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
+  scale_fill_manual(values = diel_colors) +
+  theme_classic() +
+  theme(legend.position = "none")
+tomplot
+```
+```{r}
+tomplot <- ggplot(di.alpha, aes(x = Diel_Time, y = TOM, fill = Diel_Time)) +
+  geom_boxplot(width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
+  scale_fill_manual(values = diel_colors) +
+  labs(
+    x = "Diel Time",
+    y = "% TOM"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    
+    # make axis titles bigger
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    
+    # make axis tick labels bigger
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14)
+  )
+
+tomplot
+```
+
+pam plot ~not using - just wanted to look at
+```{r}
+library(ggplot2)
+
+# Make sure Diel_Time is in the correct order
+di.pam$Diel_Time <- factor(
+  di.pam$Diel_Time,
+  levels = c("T0", "T1", "T2", "T3", "T4", "T5", "T6")
+)
+
+# Pastel colors
+diel_colors <- c(
+  "T0" = "#FBB4AE",  # pastel pink
+  "T1" = "#B3CDE3",  # pastel blue
+  "T2" = "#CCEBC5",  # pastel green
+  "T3" = "#DECBE4",  # pastel purple
+  "T4" = "#FED9A6",  # pastel orange
+  "T5" = "#FFFFCC",  # pastel yellow
+  "T6" = "#E5D8BD"   # pastel tan
+)
+
+ggplot(di.pam, aes(x = Diel_Time, y = Y.II., fill = Diel_Time)) +
+  geom_boxplot(width = 0.7, outlier.shape = 16) +
+  scale_fill_manual(values = diel_colors) +
+  labs(
+    x = "Diel Time",
+    y = "Y(II)"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+```
+
+
+Combo plot for diel
+
+
+```{r}
+library(cowplot)
+di.comb <- cowplot::plot_grid(
+  plotdi,
+  tomplot,
+  ncol = 1)
+di.comb
+```
+
+```{r}
+ggsave("di_combo_plot.pdf", plot = di.comb, width = 10, height = 10, dpi = 300)
+```
+
+done done done :))
