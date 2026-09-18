@@ -503,6 +503,15 @@ the 1|Mat accounts for samples within mats not being truly independent, especial
 *only included stat sig models, but ran these for each alpha div stat
 *no need for interactions between variables 
 ```{r}
+iess.alpha <- read.csv("iess.alpha.csv")
+```
+
+```{r}
+library(lme4)
+library(sjPlot)
+```
+
+```{r}
 iess.alpha.2 <- lmer(InvSimpson ~ Site + Sample.Type + (1|Mat) , data = iess.alpha, REML = FALSE)
 summary(iess.alpha.2)
 ```
@@ -729,6 +738,10 @@ ggplot(iess.alpha, aes(x = Sample.Type, y = X..Organic.Carbon, color = Site)) +
 
 ~nutrient correlations 
 to see families across the entire experiment:
+```{r}
+iessmdffam <- read.csv("iess.mdffam.csv")
+```
+
 ```{r}
 #note:iessmdffam ~ calculated and saved below ..need to  read back in here
 iessmdffam %>%
@@ -1060,6 +1073,14 @@ ie.pcoa.1
 
 ```
 
+```{r}
+ggsave("iess.pcoa.pdf",
+       plot = ie.pcoa.1,
+       width = 6,
+       height = 6,
+       dpi = 300)
+```
+
  
 
 Final combo plot!
@@ -1242,7 +1263,7 @@ sm.pcaochsht.1 <- plot_ordination(
   color = "Month_Year"
 ) +
   geom_point(size = 6, alpha = 0.8) +
-  stat_ellipse(aes(group = Site), type = "t", linewidth = .2) +
+  #stat_ellipse(aes(group = Site), type = "t", linewidth = .2) +
   scale_color_viridis_d(name = "Month_Year") +
   theme_classic(base_size = 22) +
   theme(
@@ -1710,6 +1731,20 @@ ps.comp.plot
 ggsave("ps_comp_plot.pdf", plot = ps.comp.plot, width = 13, height = 21, dpi = 300)
 ```
 
+OR (disregards bar plots )
+```{r}
+ps.comp.plot.2 <- cowplot::plot_grid(
+  ps.mid,
+  sm.pcaochsht.1,
+  ncol = 1,
+  align = "h",
+  rel_heights  = c(1,1))  # optional panel labels
+
+ps.comp.plot.2
+```
+```{r}
+ggsave("ps.comp.plot.2.pdf", plot = ps.comp.plot.2, width = 10, height = 10, dpi = 300)
+```
 
 Diff Abund! 
 (1) Month_Year
@@ -2875,6 +2910,11 @@ Nutrients
 nutrient correlations:
 ~nutrient correlations 
 to see families across the entire experiment:
+
+```{r}
+dimdffam <- read.csv("di.mdffam.csv")
+```
+
 ```{r}
 #note:dsmdffam ~ calculated and saved  ..need to  read back in here
 dimdffam %>%
@@ -3083,6 +3123,41 @@ tomplot <- ggplot(di.alpha, aes(x = Diel_Time, y = TOM, fill = Diel_Time)) +
 
 tomplot
 ```
+updated plot (no bar plot addition)
+```{r}
+tomplot <- ggplot(di.alpha, aes(x = Diel_Time, y = TOM, fill = Diel_Time)) +
+  geom_boxplot(width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.7) +
+  scale_fill_manual(values = c(
+    "0" = "#BFD7EA",
+    "1" = "#F6D6A8",
+    "2" = "#D8BFD8",
+    "3" = "#B8C9B9",
+    "4" = "#F2B5C8",
+    "5" = "#F2D98D",
+    "6" = "#AFCDE3"
+  )) +
+  labs(
+    x = "Diel Time",
+    y = "% TOM"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14)
+  )
+
+tomplot
+```
+
+```{r}
+ggsave("tomplot.pdf", plot = tomplot, width = 6, height = 6, dpi = 300)
+```
 
 pam plot ~not using - just wanted to look at
 ```{r}
@@ -3132,6 +3207,7 @@ di.comb <- cowplot::plot_grid(
   ncol = 1)
 di.comb
 ```
+
 
 ```{r}
 ggsave("di_combo_plot.pdf", plot = di.comb, width = 10, height = 10, dpi = 300)
